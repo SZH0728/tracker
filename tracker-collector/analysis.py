@@ -9,35 +9,123 @@ logger = getLogger(__name__)
 
 
 class Analysis(object):
+    """
+    Analysis class for processing data with different methods.
+    用于使用不同方法处理数据的 Analysis 类。
+    """
     def __init__(self):
+        """
+        Initialize the Analysis object.
+        初始化 Analysis 对象。
+        """
+
+        # A dictionary mapping URLs to callable methods.
+        # 映射 URL 到可调用方法的字典。
         self._method: dict[str, Callable] = {}
 
-    def load(self, url: str, method: str):
+    def load(self, url: str, method: str = None):
+        """
+        Load a specific method for a given URL.
+        为给定的 URL 加载特定的方法。
+
+        :param: url (str): The URL to associate the method with.
+                           与方法关联的 URL。
+        :param: method (str): The name of the method to use.
+                              要使用的方法名称。
+        """
         if not method:
-            method = 'SPLIT()'
-            logger.warning(f'{url} method is empty, use default method: {method}')
+            logger.warning(f'{url} method is empty, use default method: SPLIT()')
+            # If no method is specified, use the default method, i.e., SPLIT(None)
+            # 如果没有指定方法，则使用默认方法，即SPLIT(None)
+            self._method[url] = Split()
 
         if method.startswith('SPLIT'):
-            self._method[url] = self._split(method)
+            # If the method starts with 'SPLIT', use the Split class with the specified keyword
+            # 如果方法以 'SPLIT' 开头，则使用 Split 类，并指定关键字
+            self._method[url] = Split(method)
 
     def analyze(self, url: str, data: str):
+        """
+        Analyze data using the method associated with the given URL.
+        使用与给定 URL 关联的方法分析数据。
+
+        :param: url (str): The URL associated with a specific analysis method.
+                与特定分析方法关联的 URL。
+        :param: data (str): The data to be analyzed.
+                待分析的数据。
+        :return: The result of the analysis or an empty list if no method is found.
+                分析的结果或如果没有找到方法则返回空列表。
+        """
         if url in self._method:
+            # If a method is found, log the method and use it to analyze the data
+            # 如果找到方法，记录方法并使用它分析数据
             logger.info(f'{url} method is {self._method[url]}')
             return self._method[url](data)
+
         else:
+            # If no method is found, log a warning and return an empty list
+            # 如果没有找到方法，则记录警告并返回空列表
             logger.warning(f'{url} method is not found, so the data will be dropped')
             return []
 
-    @staticmethod
-    def _split(expression: str):
-        regex = compile(r'SPLIT\((.*?)\)')
-        keyword = regex.findall(expression)
-        keyword = keyword[0] if keyword else None
 
-        def split(data: str):
-            return [i for i in data.split(keyword) if i]
+class Split(object):
+    """
+    Split data by keyword
+    根据关键字分割数据
+    """
+    def __init__(self, keyword: str = None):
+        """
+        Initialize the Split object.
+        初始化 Split 对象。
 
-        return split
+        :param: keyword (str): The keyword used to split the data. Defaults to None.
+                               用于分割数据的关键字，默认为 None。
+        """
+        self.keyword = keyword
+
+        # Compile a regular expression pattern that matches 'SPLIT(keyword)'
+        # 编译一个正则表达式模式，匹配 'SPLIT(关键字)' 的形式
+        self._regex = compile(r'SPLIT\((.*?)\)')
+
+        logger.debug(f'Split object initialized with keyword: {self.keyword}')
+
+    def __call__(self, data: str) -> list[str]:
+        """
+        Analyze and split the input data based on the keyword.
+        分析并基于关键字分割输入数据。
+
+        :param: data (str): The input data to be split.
+                            输入的数据，将被分割。
+        :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
+                使用关键字分割输入数据后得到的子字符串列表。
+
+        """
+        return self.analyze(data)
+
+    def __repr__(self) -> str:
+        """
+        Return a string representation of the Split object.
+        返回 Split 对象的字符串表示形式。
+        """
+        return f'Split(keyword={self.keyword})'
+
+    def analyze(self, data: str) -> list[str]:
+        """
+        Analyze and split the input data based on the keyword.
+        分析并基于关键字分割输入数据。
+
+        :param: data (str): The input data to be split.
+                            输入的数据，将被分割。
+        :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
+                使用关键字分割输入数据后得到的子字符串列表。
+        """
+
+        logger.info(f'Splitting data using keyword: {self.keyword}')
+
+        # Split the data using the keyword and filter out any empty strings
+        # 使用关键字分割数据，并过滤掉任何空字符串
+        return [i for i in data.split(self.keyword) if i]
 
 
 if __name__ == '__main__':
