@@ -38,6 +38,7 @@ class Analysis(object):
             # If no method is specified, use the default method, i.e., SPLIT(None)
             # 如果没有指定方法，则使用默认方法，即SPLIT(None)
             self._method[url] = Split()
+            return
 
         if method.startswith('SPLIT'):
             # If the method starts with 'SPLIT', use the Split class with the specified keyword
@@ -100,7 +101,13 @@ class Split(object):
         if keyword:
             # If a keyword is provided, extract it from the regex pattern
             # 如果提供了关键字，则从正则表达式模式中提取关键字
-            self.keyword = regex.findall(keyword)[0]
+            try:
+                self.keyword = regex.findall(keyword)[0]
+            except IndexError:
+                # Handle non-valid SPLIT methods
+                # 处理非有效SPLIT方法
+                logger.warning(f'{keyword} is not a valid SPLIT method, use default method: SPLIT()')
+                self.keyword = None
 
             if not self.keyword:
                 # If no keyword is found, set it to None(Special case for SPLIT())
@@ -167,8 +174,15 @@ class Regex(object):
 
         # Extract the keyword from the regex pattern, and compile the regular expression
         # 从正则表达式模式中提取关键字，并编译正则表达式
-        self.keyword = regex.findall(keyword)[0]
-        self.regex = compile(self.keyword)
+        try:
+            self.keyword = regex.findall(keyword)[0]
+        except IndexError:
+            # Handle non-valid REGEX methods
+            # 处理非有效REGEX方法
+            logger.warning(f'{keyword} is not a valid REGEX method')
+            raise ValueError(f'{keyword} is not a valid REGEX method')
+        else:
+            self.regex = compile(self.keyword)
 
         logger.debug(f'Regex object initialized with keyword: {self.keyword}')
 
