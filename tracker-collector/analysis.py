@@ -44,6 +44,17 @@ class Analysis(object):
             # 如果方法以 'SPLIT' 开头，则使用 Split 类，并指定关键字
             self._method[url] = Split(method)
 
+        elif method.startswith('REGEX'):
+            # If the method starts with 'REGEX', use the Regex class with the specified keyword
+            # 如果方法以 'REGEX' 开头，则使用 Regex 类，并指定关键字
+            self._method[url] = Regex(method)
+
+        else:
+            # If the method is not recognized, log a warning and use the default method
+            # 如果方法未被识别，则记录警告并使用默认方法
+            logger.warning(f'{url} method is not recognized, use default method: SPLIT()')
+            self._method[url] = Split()
+
     def analyze(self, url: str, data: str):
         """
         Analyze data using the method associated with the given URL.
@@ -82,11 +93,23 @@ class Split(object):
         :param: keyword (str): The keyword used to split the data. Defaults to None.
                                用于分割数据的关键字，默认为 None。
         """
-        self.keyword = keyword
-
         # Compile a regular expression pattern that matches 'SPLIT(keyword)'
         # 编译一个正则表达式模式，匹配 'SPLIT(关键字)' 的形式
-        self._regex = compile(r'SPLIT\((.*?)\)')
+        regex = compile(r'SPLIT\((.*?)\)')
+
+        if keyword:
+            # If a keyword is provided, extract it from the regex pattern
+            # 如果提供了关键字，则从正则表达式模式中提取关键字
+            self.keyword = regex.findall(keyword)[0]
+
+            if not self.keyword:
+                # If no keyword is found, set it to None(Special case for SPLIT())
+                # 如果没有找到关键字，则设置为 None(针对SPLIT()的情况)
+                self.keyword = None
+        else:
+            # If no keyword is provided, set it to None
+            # 如果没有提供关键字，则设置为 None
+            self.keyword = None
 
         logger.debug(f'Split object initialized with keyword: {self.keyword}')
 
@@ -121,11 +144,66 @@ class Split(object):
                 使用关键字分割输入数据后得到的子字符串列表。
         """
 
-        logger.info(f'Splitting data using keyword: {self.keyword}')
+        logger.debug(f'Splitting data using keyword: {self.keyword}')
 
         # Split the data using the keyword and filter out any empty strings
         # 使用关键字分割数据，并过滤掉任何空字符串
         return [i for i in data.split(self.keyword) if i]
+
+
+class Regex(object):
+    """
+    Regex data by keyword
+    根据关键字正则化数据
+    """
+    def __init__(self, keyword: str):
+        """
+        Initialize the Regex object.
+        初始化 Regex 对象。
+        """
+        # Compile a regular expression pattern that matches 'REGEX(keyword)'
+        # 编译一个正则表达式模式，匹配 'REGEX(关键字)' 的形式
+        regex = compile(r'REGEX\((.*?)\)')
+
+        # Extract the keyword from the regex pattern, and compile the regular expression
+        # 从正则表达式模式中提取关键字，并编译正则表达式
+        self.keyword = regex.findall(keyword)[0]
+        self.regex = compile(self.keyword)
+
+        logger.debug(f'Regex object initialized with keyword: {self.keyword}')
+
+    def __repr__(self):
+        """
+        Return a string representation of the Regex object.
+        返回 Regex 对象的字符串表示形式。
+        """
+        return f'Regex(keyword={self.keyword})'
+
+    def __call__(self, data: str) -> list[str]:
+        """
+        Analyze and split the input data based on the keyword.
+        分析并基于关键字分割输入数据。
+
+        :param: data (str): The input data to be split.
+                            输入的将被分割的数据。
+        :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
+                            使用关键字分割输入数据后得到的子字符串列表。
+        """
+        return self.analyze(data)
+
+    def analyze(self, data: str) -> list[str]:
+        """
+        Analyze and split the input data based on the keyword.
+        使用给定的正则表达式提取数据
+
+        :param: data (str): The input data to be split.
+                            输入的将被分割的数据。
+        """
+        logger.debug(f'Regex data using keyword: {self.keyword}')
+
+        # Use the regular expression to find all matches in the data
+        # 使用正则表达式在数据中找到所有匹配项
+        return [i for i in self.regex.findall(data) if i]
 
 
 if __name__ == '__main__':
