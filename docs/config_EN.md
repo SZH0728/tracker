@@ -65,7 +65,7 @@ Below is an explanation of the various configuration items in the configuration 
 
 - **method**
   - **Meaning**: The parsing method for tracker data, default is `SPLIT()`.
-  - **Example Value**: `SPLIT(\n)` (For more details, see the [Parsing Method](https://github.com/SZH0728/tracker-collector/blob/main/docs/rule_EN.md).)
+  - **Example Value**: `SPLIT(\n)` (For more details, see the [Parsing Method](/docs/rule_EN.md).)
 
 - **headers**
   - **Meaning**: Custom HTTP request headers that are merged with the default request headers.

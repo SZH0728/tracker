@@ -65,7 +65,7 @@
 
 - **method**
   - **含义**: 跟踪器数据的解析方法，默认为`SPLIT()`。
-  - **示例值**: `SPLIT(\n)` (具体说明请参考[解析方法](https://github.com/SZH0728/tracker-collector/blob/main/docs/rule_ZH.md))
+  - **示例值**: `SPLIT(\n)` (具体说明请参考[解析方法](/docs/rule_ZH.md))
 
 - **headers**
   - **含义**: 专属的HTTP请求头，这些请求头将与默认请求头合并。
