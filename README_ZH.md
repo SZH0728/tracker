@@ -1,21 +1,21 @@
 # tracker-collector
-
-English | [中文](/README_ZH.md)  
+[English](README.md) | 中文  
 [![GitHub last commit](https://img.shields.io/github/last-commit/SZH0728/tracker-collector.svg)](https://github.com/SZH0728/tracker-collector/commits/main)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/SZH0728/tracker-collector?sort=date)](https://github.com/SZH0728/tracker-collector/releases/latest)
 [![GitHub](https://img.shields.io/github/license/SZH0728/tracker-collector.svg)](https://github.com/SZH0728/tracker-collector/blob/main/LICENSE)
 
-A tool for automatically collecting tracker servers from the web.
+一个自动从网络上收集tracker服务器的工具。
 
-### Features
+### 特性
 
-- Automated collection of tracker information
-- Regular updates to the tracker list
-- Intelligent deduplication
+- 自动化收集 tracker 信息
+- 定期更新 tracker 列表
+- 智能去重
 
-### Usage
-1. Ensure you have Python 3.10+ installed.
-2. Clone this project locally.
-3. Write the configuration file (`config.ini`)  
-   [details](/docs/config_EN.md)
-4. Run `main.py`.
+### 使用方法
+1. 确保你已安装 Python 3.10+
+2. 复制本项目到本地
+3. 编写配置文件(config.ini)  
+   [具体介绍](/docs/config_ZH.md)
+4. 运行 `main.py`
+
