@@ -160,7 +160,7 @@ class Split(object):
 
         # Split the data using the keyword and filter out any empty strings
         # 使用关键字分割数据，并过滤掉任何空字符串
-        return [i for i in data.split(self.keyword) if i]
+        return [i.strip() for i in data.split(self.keyword) if i]
 
 
 class Regex(object):
@@ -175,7 +175,7 @@ class Regex(object):
         """
         # Compile a regular expression pattern that matches 'REGEX(keyword)'
         # 编译一个正则表达式模式，匹配 'REGEX(关键字)' 的形式
-        regex = compile(r'REGEX\((.*?)\)')
+        regex = compile(r'REGEX\((.*)\)')
 
         # Extract the keyword from the regex pattern, and compile the regular expression
         # 从正则表达式模式中提取关键字，并编译正则表达式
@@ -222,7 +222,7 @@ class Regex(object):
 
         # Use the regular expression to find all matches in the data
         # 使用正则表达式在数据中找到所有匹配项
-        return [i for i in self.regex.findall(data) if i]
+        return [i.strip() for i in self.regex.findall(data) if i]
 
 
 if __name__ == '__main__':
