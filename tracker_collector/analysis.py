@@ -108,6 +108,11 @@ class Split(object):
                 # 处理非有效SPLIT方法
                 logger.warning(f'{keyword} is not a valid SPLIT method, use default method: SPLIT()')
                 self.keyword = None
+            else:
+                # Replace escaped newlines and tabs with actual newlines and tabs
+                # 将转义后的换行符和制表符替换为实际的换行符和制表符
+                self.keyword = self.keyword.replace(r'\\n', r'\n')
+                self.keyword = self.keyword.replace(r'\\t', r'\t')
 
             if not self.keyword:
                 # If no keyword is found, set it to None(Special case for SPLIT())
