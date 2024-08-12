@@ -97,7 +97,7 @@ class Config(object):
         # Load the configuration file if it exists, otherwise load the string as a configuration file.
         # 如果配置文件存在，则加载配置文件，否则将字符串作为配置文件加载。
         if exists(config):
-            self.config.read(config)
+            self.config.read(config, encoding='utf-8')
         else:
             self.config.read_string(config)
 
