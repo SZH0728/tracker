@@ -2,6 +2,7 @@
 # AUTHOR: Sun
 
 from json import loads
+from os.path import exists
 from configparser import ConfigParser
 
 
@@ -41,7 +42,7 @@ STRUCTURE = {
     },
 
     'request': {
-        'default_headers': dict,
+        'default_headers': json,
         'timeout': int,
     },
 
@@ -80,16 +81,25 @@ class Config(object):
         if not cls._instance:
             # Create a new instance
             # 创建新实例
-            cls._instance = super(Config, cls).__new__(cls, *args, **kwargs)
+            cls._instance = object.__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, config: str = 'config.ini'):
         """
         Initialize the Config object with the application's configuration file.
         使用应用程序的配置文件初始化 Config 对象。
+
+        :param config: The path to the configuration file or a string containing the configuration data.
+                       配置文件的路径或包含配置数据的字符串
         """
         self.config = ConfigParser()
-        self.config.read('config.ini')
+
+        # Load the configuration file if it exists, otherwise load the string as a configuration file.
+        # 如果配置文件存在，则加载配置文件，否则将字符串作为配置文件加载。
+        if exists(config):
+            self.config.read(config)
+        else:
+            self.config.read_string(config)
 
     def __getitem__(self, item):
         """
@@ -165,6 +175,11 @@ class OptionGetter(object):
         Initialize an OptionGetter with a specific section and the Config object.
         使用特定的节和 Config 对象初始化 OptionGetter。
         """
+        if section not in STRUCTURE and not section.startswith('tracker_'):
+            # Raise an exception if the section is invalid
+            # 如果节无效，则抛出异常
+            raise KeyError(f'Invalid config section: {section}')
+
         self.section = section
         self._config = config
 
@@ -202,7 +217,17 @@ class OptionGetter(object):
         :return: The option value associated with the name.
                  选项名称关联的值
         """
-        return STRUCTURE[self.section][option](self._config.get(self.section, option))
+        if self.section.startswith('tracker_'):
+            template = STRUCTURE['tracker_*']
+        else:
+            template = STRUCTURE[self.section]
+
+        if option not in template:
+            # Raise an exception if the option is invalid
+            # 如果选项无效，则抛出异常
+            raise KeyError(f'Invalid config option: {self.section}:{option}')
+
+        return template[option](self._config.get(self.section, option))
 
 
 if __name__ == '__main__':
