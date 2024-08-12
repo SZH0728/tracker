@@ -24,7 +24,7 @@ def create_downloader():
 
 def create_analysis():
     analysis = Analysis()
-    tracker = config.get('base', 'tracker').split(',')
+    tracker = config.get('base', 'tracker')
 
     for i in tracker:
         i = i.strip()
@@ -36,7 +36,7 @@ def create_analysis():
 
 def gather_url():
     logger.info('Gathering url...')
-    tracker = config.get('base', 'tracker').split(',')
+    tracker = config.get('base', 'tracker')
 
     for i in tracker:
         i = i.strip()
