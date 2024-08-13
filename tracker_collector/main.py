@@ -4,13 +4,15 @@
 from logging import getLogger
 from time import sleep
 
-import log
+from log import LogConfig, read_config
 from config import Config
 from download import Downloader
 from analysis import Analysis
 
 logger = getLogger(__name__)
 config = Config()
+
+LogConfig(*read_config())
 
 
 def create_downloader():
