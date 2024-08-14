@@ -111,8 +111,8 @@ class Split(object):
             else:
                 # Replace escaped newlines and tabs with actual newlines and tabs
                 # 将转义后的换行符和制表符替换为实际的换行符和制表符
-                self.keyword = self.keyword.replace(r'\\n', r'\n')
-                self.keyword = self.keyword.replace(r'\\t', r'\t')
+                self.keyword = self.keyword.replace('\\n', '\n')
+                self.keyword = self.keyword.replace('\\t', '\t')
 
             if not self.keyword:
                 # If no keyword is found, set it to None(Special case for SPLIT())
@@ -123,7 +123,7 @@ class Split(object):
             # 如果没有提供关键字，则设置为 None
             self.keyword = None
 
-        logger.debug(f'Split object initialized with keyword: {self.keyword}')
+        logger.debug(f'Split object initialized with keyword: {self.text_keyword}')
 
     def __call__(self, data: str) -> set[str]:
         """
@@ -134,7 +134,6 @@ class Split(object):
                             输入的数据，将被分割。
         :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
                 使用关键字分割输入数据后得到的子字符串列表。
-
         """
         return self.analyze(data)
 
@@ -143,7 +142,22 @@ class Split(object):
         Return a string representation of the Split object.
         返回 Split 对象的字符串表示形式。
         """
-        return f'Split(keyword={self.keyword})'
+        return f'Split(keyword={self.text_keyword})'
+
+    @property
+    def text_keyword(self):
+        """
+        Get the text representation of the keyword.
+        获取关键字的文本表示形式。
+
+        :return: The text representation of the keyword.
+                 关键字的文本表示形式。
+        """
+        if self.keyword:
+            text = self.keyword.replace('\n', '\\n')
+            return text.replace('\t', '\\t')
+        else:
+            return self.keyword
 
     def analyze(self, data: str) -> set[str]:
         """
@@ -156,7 +170,7 @@ class Split(object):
                 使用关键字分割输入数据后得到的子字符串列表。
         """
 
-        logger.debug(f'Splitting data using keyword: {self.keyword}')
+        logger.debug(f'Splitting data using keyword: {self.text_keyword}')
 
         # Split the data using the keyword and filter out any empty strings
         # 使用关键字分割数据，并过滤掉任何空字符串
