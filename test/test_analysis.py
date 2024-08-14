@@ -18,8 +18,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertIn('method is empty, use default method: SPLIT()', mock_logger.warning.call_args.args[0])
         self.assertIsInstance(analysis._method['test_url'], Split)
 
-    @patch('tracker_collector.analysis.logger')
-    def test_load_with_valid_split_method(self, mock_logger):
+    def test_load_with_valid_split_method(self):
         """
         Test loading a valid SPLIT method.
         测试加载有效的 SPLIT 方法。
@@ -28,8 +27,7 @@ class TestAnalysis(unittest.TestCase):
         analysis.load('test_url', 'SPLIT(keyword)')
         self.assertIsInstance(analysis._method['test_url'], Split)
 
-    @patch('tracker_collector.analysis.logger')
-    def test_load_with_valid_regex_method(self, mock_logger):
+    def test_load_with_valid_regex_method(self):
         """
         Test loading a valid REGEX method.
         测试加载有效的 REGEX 方法。
@@ -59,7 +57,7 @@ class TestAnalysis(unittest.TestCase):
         analysis = Analysis()
         analysis.load('test_url', 'SPLIT(keyword)')
         result = analysis.analyze('test_url', 'data_one keyword data_two keyword data_three')
-        self.assertEqual(['data_one', 'data_two', 'data_three'], result)
+        self.assertEqual({'data_one', 'data_two', 'data_three'}, result)
         self.assertIn('test_url method is Split(keyword=keyword)', mock_logger.info.call_args.args[0])
 
     @patch('tracker_collector.analysis.logger')
@@ -70,7 +68,7 @@ class TestAnalysis(unittest.TestCase):
         """
         analysis = Analysis()
         result = analysis.analyze('unknown_url', 'some data')
-        self.assertEqual([], result)
+        self.assertEqual(set(), result)
         self.assertIn('unknown_url method is not found, so the data will be dropped',
                       mock_logger.warning.call_args.args[0])
 
@@ -127,7 +125,7 @@ class TestSplit(unittest.TestCase):
         split = Split()
 
         result = split.analyze('data_one\ndata_two\ndata_three')
-        self.assertEqual(['data_one', 'data_two', 'data_three'], result)
+        self.assertEqual({'data_one', 'data_two', 'data_three'}, result)
         self.assertIn('Splitting data using keyword:', mock_logger.debug.call_args.args[0])
 
     @patch('tracker_collector.analysis.logger')
@@ -138,7 +136,7 @@ class TestSplit(unittest.TestCase):
         """
         split = Split('SPLIT(keyword)')
         result = split.analyze('data_one keyword data_two keyword data_three')
-        self.assertEqual(['data_one', 'data_two', 'data_three'], result)
+        self.assertEqual({'data_one', 'data_two', 'data_three'}, result)
         self.assertIn('Splitting data using keyword:', mock_logger.debug.call_args.args[0])
 
 
@@ -174,7 +172,7 @@ class TestRegex(unittest.TestCase):
         """
         regex = Regex('REGEX((.*?) keyword)')
         result = regex.analyze('data_one keyword data_two keyword')
-        self.assertEqual(result, ['data_one', 'data_two'])
+        self.assertEqual({'data_one', 'data_two'}, result)
         self.assertIn('Regex data using keyword', mock_logger.debug.call_args.args[0])
 
     @patch('tracker_collector.analysis.logger')
@@ -185,7 +183,7 @@ class TestRegex(unittest.TestCase):
         """
         regex = Regex('REGEX(keyword)')
         result = regex.analyze('no kw here')
-        self.assertEqual([], result)
+        self.assertEqual(set(), result)
         self.assertIn('Regex data using keyword', mock_logger.debug.call_args.args[0])
 
 

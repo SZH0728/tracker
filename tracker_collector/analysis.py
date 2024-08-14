@@ -56,7 +56,7 @@ class Analysis(object):
             logger.warning(f'{url} method is not recognized, use default method: SPLIT()')
             self._method[url] = Split()
 
-    def analyze(self, url: str, data: str):
+    def analyze(self, url: str, data: str) -> set[str]:
         """
         Analyze data using the method associated with the given URL.
         使用与给定 URL 关联的方法分析数据。
@@ -78,7 +78,7 @@ class Analysis(object):
             # If no method is found, log a warning and return an empty list
             # 如果没有找到方法，则记录警告并返回空列表
             logger.warning(f'{url} method is not found, so the data will be dropped')
-            return []
+            return set()
 
 
 class Split(object):
@@ -125,7 +125,7 @@ class Split(object):
 
         logger.debug(f'Split object initialized with keyword: {self.keyword}')
 
-    def __call__(self, data: str) -> list[str]:
+    def __call__(self, data: str) -> set[str]:
         """
         Analyze and split the input data based on the keyword.
         分析并基于关键字分割输入数据。
@@ -145,7 +145,7 @@ class Split(object):
         """
         return f'Split(keyword={self.keyword})'
 
-    def analyze(self, data: str) -> list[str]:
+    def analyze(self, data: str) -> set[str]:
         """
         Analyze and split the input data based on the keyword.
         分析并基于关键字分割输入数据。
@@ -160,7 +160,7 @@ class Split(object):
 
         # Split the data using the keyword and filter out any empty strings
         # 使用关键字分割数据，并过滤掉任何空字符串
-        return [i.strip() for i in data.split(self.keyword) if i]
+        return set(i.strip() for i in data.split(self.keyword) if i)
 
 
 class Regex(object):
@@ -198,7 +198,7 @@ class Regex(object):
         """
         return f'Regex(keyword={self.keyword})'
 
-    def __call__(self, data: str) -> list[str]:
+    def __call__(self, data: str) -> set[str]:
         """
         Analyze and split the input data based on the keyword.
         分析并基于关键字分割输入数据。
@@ -210,7 +210,7 @@ class Regex(object):
         """
         return self.analyze(data)
 
-    def analyze(self, data: str) -> list[str]:
+    def analyze(self, data: str) -> set[str]:
         """
         Analyze and split the input data based on the keyword.
         使用给定的正则表达式提取数据
@@ -222,7 +222,7 @@ class Regex(object):
 
         # Use the regular expression to find all matches in the data
         # 使用正则表达式在数据中找到所有匹配项
-        return [i.strip() for i in self.regex.findall(data) if i]
+        return set(i.strip() for i in self.regex.findall(data) if i)
 
 
 if __name__ == '__main__':
