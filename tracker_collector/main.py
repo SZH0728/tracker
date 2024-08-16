@@ -8,6 +8,7 @@ from log import LogConfig, read_config
 from config import Config
 from download import Downloader
 from analysis import Analysis
+from server import Run
 
 logger = getLogger(__name__)
 
@@ -22,6 +23,9 @@ class Main(object):
         self.log_config = LogConfig(*read_config())
         self.downloader = self.create_downloader()
         self.analysis = self.create_analysis()
+
+        thread = Run()
+        thread.start()
 
     def run(self):
         """
