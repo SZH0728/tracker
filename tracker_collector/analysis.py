@@ -2,12 +2,15 @@
 # AUTHOR: Sun
 
 from abc import ABC, abstractmethod
+from os.path import exists, isfile, join
+from os import listdir
 from typing import Callable
 from re import compile
 from logging import getLogger
 
 logger = getLogger(__name__)
 
+SCRIPT = {}
 
 class Analysis(object):
     """
@@ -235,6 +238,84 @@ class Regex(Base):
         # 使用正则表达式在数据中找到所有匹配项
         return set(i.strip() for i in self.regex.findall(data) if i)
 
+
+class Script(Base):
+    def __init__(self, keyword: str):
+        super().__init__()
+
+        regex = compile(r'SCRIPT\((.*)\)')
+        try:
+            self.keyword = regex.findall(keyword)[0]
+        except IndexError:
+            logger.warning(f'{keyword} is not a valid SCRIPT method')
+            raise ValueError(f'{keyword} is not a valid SCRIPT method')
+
+        if exists(self.keyword):
+            self.script = ScriptFile(self.keyword)
+        elif self.keyword in SCRIPT:
+            self.script = SCRIPT[self.keyword]
+        else:
+            raise ValueError(f'{keyword} is not a valid SCRIPT method')
+
+        self.keyword = self.script.name
+
+    def analyze(self, data: str) -> set[str]:
+        var = {}
+        exec(self.script.code,  {}, var)
+        return set(var['analysis'](data))
+
+
+class ScriptFile(object):
+    def __init__(self, file_path: str):
+        if not exists(file_path):
+            raise FileNotFoundError(f'{file_path} is not found')
+
+        self._file_path = file_path
+        self._code = []
+        description = compile(r'^#\s*@(.*?)\s*:\s*(.*)$')
+
+        with open(self._file_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+
+        self._data = {}
+        for i in code.split('\n'):
+            if not i:
+                continue
+
+            if not i.startswith('#'):
+                self._code.append(i)
+                continue
+
+            result = description.findall(i)
+            if not result:
+                continue
+
+            result = result[0]
+            self._data[result[0]] = result[1]
+
+    def __getitem__(self, item):
+        return self._data.get(item)
+
+    def __getattr__(self, item):
+        return self._data.get(item)
+
+    @property
+    def file_path(self):
+        return self._file_path
+
+    @property
+    def code(self):
+        return '\n'.join(self._code)
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+
+for filename in listdir('./script'):
+    filepath = join('./script', filename)
+    if isfile(filepath):
+        file = ScriptFile(filepath)
+        SCRIPT[file.name] = file
 
 if __name__ == '__main__':
     pass
