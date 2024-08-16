@@ -29,6 +29,21 @@ Below is an explanation of the various configuration items in the configuration 
   - **Meaning**: The timeout duration for HTTP requests (in seconds).
   - **Example Value**: `8` (The request times out after 8 seconds.)
 
+#### [server]
+
+- **enable**
+  - **Meaning**: Whether the server is enabled.
+  - **Example Value**: `false` (The server is disabled.)
+
+- **port**
+  - **Meaning**: The port number the server listens on.
+  - **Example Value**: `8080` (The server listens on port 8080.)
+
+- **require_headers**
+  - **Meaning**: Required headers for requests. An empty dictionary means no special headers are required.
+  - **Example Value**: `{}` (No special headers are required.)
+  
+
 #### [interval]
 
 - **second**
