@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 # AUTHOR: Sun
 
+from abc import ABC, abstractmethod
 from typing import Callable
 from re import compile
 from logging import getLogger
@@ -28,10 +29,10 @@ class Analysis(object):
         Load a specific method for a given URL.
         为给定的 URL 加载特定的方法。
 
-        :param: url (str): The URL to associate the method with.
-                           与方法关联的 URL。
-        :param: method (str): The name of the method to use.
-                              要使用的方法名称。
+        :param: The URL to associate the method with.
+                与方法关联的 URL。
+        :param: The name of the method to use.
+                要使用的方法名称。
         """
         if not method:
             logger.warning(f'{url} method is empty, use default method: SPLIT()')
@@ -61,9 +62,9 @@ class Analysis(object):
         Analyze data using the method associated with the given URL.
         使用与给定 URL 关联的方法分析数据。
 
-        :param: url (str): The URL associated with a specific analysis method.
-                与特定分析方法关联的 URL。
-        :param: data (str): The data to be analyzed.
+        :param:  The URL associated with a specific analysis method.
+                 与特定分析方法关联的 URL。
+        :param: The data to be analyzed.
                 待分析的数据。
         :return: The result of the analysis or an empty list if no method is found.
                 分析的结果或如果没有找到方法则返回空列表。
@@ -81,7 +82,32 @@ class Analysis(object):
             return set()
 
 
-class Split(object):
+class Base(ABC):
+    def __init__(self):
+        self.keyword = None
+
+    def __repr__(self):
+        """
+        Return a string representation of the object.
+        返回对象的字符串表示形式。
+        """
+        return f'{self.__class__.__name__}(keyword={self.keyword})'
+
+    def __call__(self, *args, **kwargs):
+        """
+        通过调用analyze方法实现相应逻辑
+
+        :return: A list of substrings obtained after splitting the input data using the keyword.
+                 使用关键字分割输入数据后得到的子字符串列表。
+        """
+        return self.analyze(*args, **kwargs)
+
+    @abstractmethod
+    def analyze(self, data: str) -> set[str]:
+        pass
+
+
+class Split(Base):
     """
     Split data by keyword
     根据关键字分割数据
@@ -91,9 +117,10 @@ class Split(object):
         Initialize the Split object.
         初始化 Split 对象。
 
-        :param: keyword (str): The keyword used to split the data. Defaults to None.
-                               用于分割数据的关键字，默认为 None。
+        :param: The keyword used to split the data. Defaults to None.
+                用于分割数据的关键字，默认为 None。
         """
+        super().__init__()
         # Compile a regular expression pattern that matches 'SPLIT(keyword)'
         # 编译一个正则表达式模式，匹配 'SPLIT(关键字)' 的形式
         regex = compile(r'SPLIT\((.*?)\)')
@@ -125,18 +152,6 @@ class Split(object):
 
         logger.debug(f'Split object initialized with keyword: {self.text_keyword}')
 
-    def __call__(self, data: str) -> set[str]:
-        """
-        Analyze and split the input data based on the keyword.
-        分析并基于关键字分割输入数据。
-
-        :param: data (str): The input data to be split.
-                            输入的数据，将被分割。
-        :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
-                使用关键字分割输入数据后得到的子字符串列表。
-        """
-        return self.analyze(data)
-
     def __repr__(self) -> str:
         """
         Return a string representation of the Split object.
@@ -164,10 +179,10 @@ class Split(object):
         Analyze and split the input data based on the keyword.
         分析并基于关键字分割输入数据。
 
-        :param: data (str): The input data to be split.
-                            输入的数据，将被分割。
-        :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
-                使用关键字分割输入数据后得到的子字符串列表。
+        :param: The input data to be split.
+                输入的数据，将被分割。
+        :return: A list of substrings obtained after splitting the input data using the keyword.
+                 使用关键字分割输入数据后得到的子字符串列表。
         """
 
         logger.debug(f'Splitting data using keyword: {self.text_keyword}')
@@ -177,7 +192,7 @@ class Split(object):
         return set(i.strip() for i in data.split(self.keyword) if i)
 
 
-class Regex(object):
+class Regex(Base):
     """
     Regex data by keyword
     根据关键字正则化数据
@@ -187,6 +202,7 @@ class Regex(object):
         Initialize the Regex object.
         初始化 Regex 对象。
         """
+        super().__init__()
         # Compile a regular expression pattern that matches 'REGEX(keyword)'
         # 编译一个正则表达式模式，匹配 'REGEX(关键字)' 的形式
         regex = compile(r'REGEX\((.*)\)')
@@ -205,32 +221,13 @@ class Regex(object):
 
         logger.debug(f'Regex object initialized with keyword: {self.keyword}')
 
-    def __repr__(self):
-        """
-        Return a string representation of the Regex object.
-        返回 Regex 对象的字符串表示形式。
-        """
-        return f'Regex(keyword={self.keyword})'
-
-    def __call__(self, data: str) -> set[str]:
-        """
-        Analyze and split the input data based on the keyword.
-        分析并基于关键字分割输入数据。
-
-        :param: data (str): The input data to be split.
-                            输入的将被分割的数据。
-        :return: list[str]: A list of substrings obtained after splitting the input data using the keyword.
-                            使用关键字分割输入数据后得到的子字符串列表。
-        """
-        return self.analyze(data)
-
     def analyze(self, data: str) -> set[str]:
         """
         Analyze and split the input data based on the keyword.
         使用给定的正则表达式提取数据
 
-        :param: data (str): The input data to be split.
-                            输入的将被分割的数据。
+        :param: The input data to be split.
+                输入的将被分割的数据。
         """
         logger.debug(f'Regex data using keyword: {self.keyword}')
 
