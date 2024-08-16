@@ -46,6 +46,12 @@ STRUCTURE = {
         'timeout': int,
     },
 
+    'server': {
+        'enable': bool,
+        'port': int,
+        'require_headers': json,
+    },
+
     'interval': {
         'second': int,
         'minute': int,
@@ -149,6 +155,8 @@ class Config(object):
             if option in STRUCTURE[section]:
                 # Apply the data type defined in STRUCTURE
                 # 应用 STRUCTURE 中定义的数据类型
+                if isinstance(STRUCTURE[section][option], bool):
+                    return self.config.getboolean(section, option)
                 return STRUCTURE[section][option](self.config.get(section, option))
 
         elif section.startswith('tracker_'):
@@ -158,6 +166,8 @@ class Config(object):
             if option in template:
                 # Apply the data type defined in STRUCTURE
                 # 应用 STRUCTURE 中定义的数据类型
+                if isinstance(template[option], bool):
+                    return self.config.getboolean(section, option)
                 return template[option](self.config.get(section, option))
 
         # Raise an exception if the key is invalid
@@ -227,6 +237,8 @@ class OptionGetter(object):
             # 如果选项无效，则抛出异常
             raise KeyError(f'Invalid config option: {self.section}:{option}')
 
+        if isinstance(template[option], bool):
+            return self._config.getboolean(self.section, option)
         return template[option](self._config.get(self.section, option))
 
 
