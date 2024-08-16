@@ -30,6 +30,10 @@ Below is an explanation of the various configuration items in the configuration 
   - **Example Value**: `8` (The request times out after 8 seconds.)
 
 #### [server]
+```
+Note: It is not recommended to run the server under public network conditions,
+      to prevent the server from being attacked due to unknown vulnerabilities.
+```
 
 - **enable**
   - **Meaning**: Whether the server is enabled.
