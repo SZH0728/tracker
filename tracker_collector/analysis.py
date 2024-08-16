@@ -12,11 +12,13 @@ logger = getLogger(__name__)
 
 SCRIPT = {}
 
+
 class Analysis(object):
     """
     Analysis class for processing data with different methods.
     用于使用不同方法处理数据的 Analysis 类。
     """
+
     def __init__(self):
         """
         Initialize the Analysis object.
@@ -53,6 +55,11 @@ class Analysis(object):
             # If the method starts with 'REGEX', use the Regex class with the specified keyword
             # 如果方法以 'REGEX' 开头，则使用 Regex 类，并指定关键字
             self._method[url] = Regex(method)
+
+        elif method.startswith('SCRIPT'):
+            # If the method starts with 'SCRIPT', use the Script class with the specified keyword
+            # 如果方法以 'SCRIPT' 开头，则使用 Script 类，并指定关键字
+            self._method[url] = Script(method)
 
         else:
             # If the method is not recognized, log a warning and use the default method
@@ -115,6 +122,7 @@ class Split(Base):
     Split data by keyword
     根据关键字分割数据
     """
+
     def __init__(self, keyword: str = None):
         """
         Initialize the Split object.
@@ -200,10 +208,14 @@ class Regex(Base):
     Regex data by keyword
     根据关键字正则化数据
     """
+
     def __init__(self, keyword: str):
         """
         Initialize the Regex object.
         初始化 Regex 对象。
+
+        :param: The keyword used to split the data.
+                用于分割数据的关键字。
         """
         super().__init__()
         # Compile a regular expression pattern that matches 'REGEX(keyword)'
@@ -241,8 +253,17 @@ class Regex(Base):
 
 class Script(Base):
     def __init__(self, keyword: str):
+        """
+        Initialize the Script object.
+        初始化 Script 对象。
+
+        :param keyword: The keyword used to identify the name or the path of the script.
+                        关键字，用于标识脚本的名称或路径。
+        """
         super().__init__()
 
+        # Find the script keyword inside the given string
+        # 在给定的字符串中找到脚本关键字
         regex = compile(r'SCRIPT\((.*)\)')
         try:
             self.keyword = regex.findall(keyword)[0]
@@ -251,8 +272,12 @@ class Script(Base):
             raise ValueError(f'{keyword} is not a valid SCRIPT method')
 
         if exists(self.keyword):
+            # If the keyword is a valid path, create a ScriptFile object
+            # 如果关键字是一个有效的路径，则创建一个 ScriptFile 对象
             self.script = ScriptFile(self.keyword)
         elif self.keyword in SCRIPT:
+            # If the keyword is a valid script name, read a ScriptFile object
+            # 如果关键字是一个有效的脚本名称，则读取一个 ScriptFile 对象
             self.script = SCRIPT[self.keyword]
         else:
             raise ValueError(f'{keyword} is not a valid SCRIPT method')
@@ -260,60 +285,117 @@ class Script(Base):
         self.keyword = self.script.name
 
     def analyze(self, data: str) -> set[str]:
+        """
+        Analyze the input data by executing the script's analysis function.
+        通过执行脚本的 analysis 函数对输入数据进行分析。
+
+        :param data: The input data to be analyzed.
+                     输入的将被分析的数据。
+        :return: A set of strings representing the analysis results.
+                 表示分析结果的字符串集合。
+        """
         var = {}
-        exec(self.script.code,  {}, var)
+        # Execute the script's code in a local namespace
+        # 在本地命名空间中执行脚本的代码
+        exec(self.script.code, {}, var)
+        # Call the 'analysis' function from the executed script and return its results
+        # 调用从执行脚本中得到的 'analysis' 函数并返回其结果
         return set(var['analysis'](data))
 
 
 class ScriptFile(object):
+    """
+    A class to represent a script file.
+    用于表示脚本文件的类。
+    """
     def __init__(self, file_path: str):
+        """
+        Initialize the ScriptFile object.
+        初始化 ScriptFile 对象。
+
+        :param file_path: The path to the script file.
+                          脚本文件的路径。
+        """
         if not exists(file_path):
             raise FileNotFoundError(f'{file_path} is not found')
 
         self._file_path = file_path
         self._code = []
-        description = compile(r'^#\s*@(.*?)\s*:\s*(.*)$')
+        comment_description_regex = compile(r'^#\s*@(.*?)\s*:\s*(.*)$')
 
         with open(self._file_path, 'r', encoding='utf-8') as f:
-            code = f.read()
+            for line in f:
+                line = line.strip()
 
-        self._data = {}
-        for i in code.split('\n'):
-            if not i:
-                continue
+                if not line:
+                    # Skip empty lines
+                    # 跳过空行
+                    continue
 
-            if not i.startswith('#'):
-                self._code.append(i)
-                continue
-
-            result = description.findall(i)
-            if not result:
-                continue
-
-            result = result[0]
-            self._data[result[0]] = result[1]
+                if line.startswith('#'):
+                    # Extract metadata from comments
+                    # 从注释中提取元数据
+                    match = comment_description_regex.match(line)
+                    if match:
+                        key, value = match.groups()
+                        self._data[key] = value
+                else:
+                    # Add non-comment lines to the script code
+                    # 将非注释行添加到脚本代码中
+                    self._code.append(line)
 
     def __getitem__(self, item):
+        """
+        Retrieve metadata by key.
+        通过key获取元数据。
+        """
         return self._data.get(item)
 
     def __getattr__(self, item):
+        """
+        Retrieve metadata as attributes.
+        获取元数据作为属性。
+        """
         return self._data.get(item)
 
     @property
     def file_path(self):
+        """
+        Get the file path of the script.
+        获取脚本的文件路径。
+        """
         return self._file_path
 
     @property
     def code(self):
+        """
+        Get the compiled code of the script.
+        获取脚本的编译代码。
+        """
         return '\n'.join(self._code)
 
     def get(self, key, default=None):
+        """
+        Get metadata by key with a default value.
+        通过key获取元数据
+
+        :param key: The key of the metadata.
+                    元数据的key
+        :param default: The default value of the metadata.
+                        元数据的默认值
+        :return: The metadata value.
+                 元数据值
+        """
         return self._data.get(key, default)
 
 
+# Load all script files from the './script' directory
+# 从 './script' 目录加载所有脚本文件
 for filename in listdir('./script'):
     filepath = join('./script', filename)
     if isfile(filepath):
+        # Create a ScriptFile object
+        # 创建一个 ScriptFile 对象
         file = ScriptFile(filepath)
         SCRIPT[file.name] = file
 

@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 # @name: example
+# @author:
 # @description: An example for script
 # @requirement:
 # CODE
