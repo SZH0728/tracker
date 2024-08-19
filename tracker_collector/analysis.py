@@ -61,6 +61,16 @@ class Analysis(object):
             # 如果方法以 'SCRIPT' 开头，则使用 Script 类，并指定关键字
             self._method[url] = Script(method)
 
+        elif method.startswith('XPATH'):
+            # If the method starts with 'XPATH', use the XPath class with the specified keyword
+            # 如果方法以 'XPATH' 开头，则使用 XPath 类，并指定关键字
+            self._method[url] = Xpath(method)
+
+        elif method.startswith('CSS'):
+            # If the method starts with 'CSS', use the Css class with the specified keyword
+            # 如果方法以 'CSS' 开头，则使用 Css 类，并指定关键字
+            self._method[url] = CSS(method)
+
         else:
             # If the method is not recognized, log a warning and use the default method
             # 如果方法未被识别，则记录警告并使用默认方法
@@ -252,6 +262,10 @@ class Regex(Base):
 
 
 class Script(Base):
+    """
+    Get data by executing a script
+    执行脚本获取数据
+    """
     def __init__(self, keyword: str):
         """
         Initialize the Script object.
@@ -302,6 +316,99 @@ class Script(Base):
         # 调用从执行脚本中得到的 'analysis' 函数并返回其结果
         return set(var['analysis'](data))
 
+
+class Xpath(Base):
+    """
+    Get data by Xpath
+    根据 Xpath 提取数据
+    """
+    def __init__(self, keyword: str):
+        """
+        Initialize the Xpath object.
+        初始化 Xpath 对象。
+
+        :param keyword: The XPath expression used to extract data from the HTML document.
+                        XPath 表达式，用于从 HTML 文档中提取数据。
+                """
+        super().__init__()
+
+        regex = compile(r'XPATH\((.*)\)')
+
+        try:
+            self.keyword = regex.findall(keyword)[0]
+        except IndexError:
+            logger.warning(f'{keyword} is not a valid XPATH method')
+            raise ValueError(f'{keyword} is not a valid XPATH method')
+
+        logger.debug(f'Xpath object initialized with keyword: {self.keyword}')
+
+    def analyze(self, data: str) -> set[str]:
+        """
+        Analyze the input HTML data using the XPath expression.
+        使用 XPath 表达式分析输入的 HTML 数据。
+
+        :param data: The HTML content to be analyzed.
+                        待分析的 HTML 内容。
+        :return: A set of strings representing the extracted data.
+                    表示提取的数据的字符串集合。
+        """
+        from lxml import etree
+        logger.debug(f'Xpath data using keyword: {self.keyword}')
+
+        # Parse the HTML content
+        # 解析 HTML 内容
+        root = etree.HTML(data)
+        # Extract data using the XPath expression
+        # 使用 XPath 表达式提取数据
+        return set(i.strip() for i in root.xpath(self.keyword) if i)
+
+
+class CSS(Base):
+    """
+    Get data by CSS selector
+    根据 CSS 选择器提取数据
+    """
+    def __init__(self, keyword: str):
+        """
+        Initialize the CSS object.
+        初始化 CSS 对象。
+
+        :param keyword: The CSS selector used to extract data from the HTML document.
+                        CSS 选择器，用于从 HTML 文档中提取数据。
+        """
+        super().__init__()
+
+        # Compile the regular expression to find the CSS keyword
+        # 编译正则表达式以找到 CSS 关键字
+        regex = compile(r'CSS\((.*)\)')
+
+        try:
+            self.keyword = regex.findall(keyword)[0]
+        except IndexError:
+            logger.warning(f'{keyword} is not a valid CSS method')
+            raise ValueError(f'{keyword} is not a valid CSS method')
+
+        logger.debug(f'CSS object initialized with keyword: {self.keyword}')
+
+    def analyze(self, data: str) -> set[str]:
+        """
+        Analyze the input HTML data using the CSS selector.
+        使用 CSS 选择器分析输入的 HTML 数据。
+
+        :param data: The HTML content to be analyzed.
+                        待分析的 HTML 内容。
+        :return: A set of strings representing the extracted data.
+                    表示提取的数据的字符串集合。
+        """
+        from pyquery import PyQuery
+        logger.debug(f'CSS data using keyword: {self.keyword}')
+
+        # Create a PyQuery object from the HTML content
+        # 从 HTML 内容创建 PyQuery 对象
+        doc = PyQuery(data)
+        # Extract data using the CSS selector
+        # 使用 CSS 选择器提取数据
+        return set(i.strip() for i in doc(self.keyword).items() if i)
 
 class ScriptFile(object):
     """
