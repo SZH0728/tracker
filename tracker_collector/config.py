@@ -39,6 +39,7 @@ STRUCTURE = {
         'thread_pool_size': int,
         'save_file': str,
         'tracker': split,
+        'plugin': split,
     },
 
     'request': {
