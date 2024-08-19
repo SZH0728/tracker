@@ -46,7 +46,13 @@ Note: It is not recommended to run the server under public network conditions,
 - **require_headers**
   - **Meaning**: Required headers for requests. An empty dictionary means no special headers are required.
   - **Example Value**: `{}` (No special headers are required.)
-  
+
+- **plugin**
+  - **Meaning**: The name of the plugin to enable, with multiple plugin sources separated by an English comma `,`.
+  - **Example Value**: `xpath` (Enables the plugin named `xpath`)
+  - **Available Values**: 
+    **`xpath`**: Enables support for XPath syntax (requires the `lxml` library)  
+    **`css`**: Enables support for CSS selector syntax (requires the `PyQuery` library)
 
 #### [interval]
 

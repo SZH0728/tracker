@@ -47,4 +47,17 @@
       def analysis(text: str) -> set[str]:
           return set(i for i in text.split() if i)
       ```
-      
+
+4. XPATH:
+   - Requirements: The `lxml` library needs to be installed, and the `xpath` plugin must be enabled in the configuration.
+   - Description: Use XPath expressions to extract content from web pages.
+   - Parameters: XPath expression.
+   - Example: `XPATH(//div[@class="content"]/text())` (Extracts the text within div elements with a class of `content`.)
+     `Note: XPath expressions must specify the text to be extracted, and None values will be automatically ignored.`
+
+5. CSS:
+   - Requirements: The `PyQuery` library needs to be installed, and the `css` plugin must be enabled in the configuration.
+   - Description: Use CSS selectors to extract content from web pages.
+   - Parameters: CSS selector.
+   - Example: `CSS(.content)` (Extracts the text within elements with a class of `content`.)
+     `Note: CSS selectors do not need to specify the text to be extracted; the .text() method in the code already extracts the text.`

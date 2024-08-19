@@ -47,3 +47,17 @@
       def analysis(text: str) -> set[str]:
           return set(i for i in text.split() if i)
       ```
+
+4. XPATH:
+   - 要求：需要安装`lxml`库，并在配置中启用插件`xpath`
+   - 描述：使用XPath表达式提取网页中的内容
+   - 参数：XPath表达式
+   - 示例：`XPATH(//div[@class="content"]/text())` (提取class为`content`的div元素中的文本)  
+     `注意：xpath表达式必须指定提取的文本，None数据会被自动忽略`
+
+5. CSS:
+   - 要求：需要安装`PyQuery`库，并在配置中启用插件`css`
+   - 描述：使用CSS选择器提取网页中的内容
+   - 参数：CSS选择器
+   - 示例：`CSS(.content)` (提取class为`content`的元素中的文本)
+     `注意：css选择器不必指定提取的文本，代码中使用.text()方法已经提取了文本`
