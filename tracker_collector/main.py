@@ -12,6 +12,11 @@ from server import Run
 
 logger = getLogger(__name__)
 
+PluginToLib = {
+    'xpath': 'lxml',
+    'css': 'PyQuery',
+}
+
 
 class Main(object):
     """
@@ -23,6 +28,18 @@ class Main(object):
         self.log_config = LogConfig(*read_config())
         self.downloader = self.create_downloader()
         self.analysis = self.create_analysis()
+
+        plugin = self.config.get('base', 'plugin')
+        for i in plugin:
+            if i not in PluginToLib:
+                logger.warning(f'Plugin {i} cannot be found, please make sure the spelling is correct')
+                continue
+
+            try:
+                __import__(PluginToLib[i])
+            except ImportError:
+                logger.warning(f'Plugin {i} not found, please install it first')
+                raise ImportError(f'Plugin {i} not found, please install it first')
 
         thread = Run()
         thread.start()
