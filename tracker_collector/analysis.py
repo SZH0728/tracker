@@ -8,9 +8,14 @@ from typing import Callable
 from re import compile
 from logging import getLogger
 
+from config import Config
+
 logger = getLogger(__name__)
 
 SCRIPT = {}
+
+config = Config()
+plugins = config.get('base', 'plugin')
 
 
 class Analysis(object):
@@ -62,13 +67,22 @@ class Analysis(object):
             self._method[url] = Script(method)
 
         elif method.startswith('XPATH'):
-            # If the method starts with 'XPATH', use the XPath class with the specified keyword
-            # 如果方法以 'XPATH' 开头，则使用 XPath 类，并指定关键字
+            # If the method starts with 'XPATH', judge whether to enable the plugin,
+            # use the XPath class with the specified keyword
+            # 如果方法以 'XPATH' 开头，判断是否启用插件，使用 XPath 类，并指定关键字
+            if method.lower() not in plugins:
+                logger.error(f'{method} method is not available, please enable plug-in: xpath')
+                raise ValueError(f'{method} method is not available, please enable plug-in: xpath')
+
             self._method[url] = Xpath(method)
 
         elif method.startswith('CSS'):
-            # If the method starts with 'CSS', use the Css class with the specified keyword
-            # 如果方法以 'CSS' 开头，则使用 Css 类，并指定关键字
+            # If the method starts with 'CSS', judge whether to enable the plugin,
+            # use the Css class with the specified keyword
+            # 如果方法以 'CSS' 开头，判断是否启用插件，使用 Css 类，并指定关键字
+            if method.lower() not in plugins:
+                logger.error(f'{method} method is not available, please enable plug-in: css')
+                raise ValueError(f'{method} method is not available, please enable plug-in: css')
             self._method[url] = CSS(method)
 
         else:
