@@ -67,7 +67,10 @@ def test_registry_registers_and_returns_base_parser(registry: ParserRegistry, ra
     @param raw_request 成功上游响应视图。
     @return 无返回值。
     """
-    @registry.register('base-v1')
+    decorator = registry.register('base-v1')
+    assert inspect.isfunction(decorator)
+
+    @decorator
     def base_parser(request: RawRequest, options: Mapping[str, str]) -> list[str]:
         assert request is raw_request
         assert options == {'prefix': 'udp'}
@@ -133,6 +136,9 @@ def test_factory_builds_parser_with_immutable_options(registry: ParserRegistry, 
     ))
 
     assert configured['configured-v1'](raw_request) == ['udp']
+    with pytest.raises(TypeError):
+        configured['other'] = factory.resolve_parser('base-v1')  # type: ignore[index]  # 验证构造结果不可修改
+    assert factory.resolve_parser('configured-v1')(raw_request) == ['udp']
 
 
 def test_factory_rejects_configured_name_conflicting_with_base(registry: ParserRegistry) -> None:
@@ -208,10 +214,40 @@ def test_factory_resolves_direct_base_to_single_argument_parser(registry: Parser
         return []
 
     factory = ParserFactory(registry)
-    parser = factory.resolve_parser('base-v1', {})
+    factory.build_configured_parsers(())
+    parser = factory.resolve_parser('base-v1')
 
+    assert inspect.isfunction(parser)
+    assert parser is factory.resolve_parser('base-v1')
     assert len(inspect.signature(parser).parameters) == 1
     assert parser(raw_request) == []
+
+
+def test_factory_refreshes_base_parser_table_only_during_build(registry: ParserRegistry, raw_request: RawRequest) -> None:
+    """
+    @brief 验证基础解析器仅在构造阶段封装并刷新。
+    @param registry 独立的基础解析器注册表。
+    @param raw_request 成功上游响应视图。
+    @return 无返回值。
+    """
+    @registry.register('first-v1')
+    def first_parser(request: RawRequest, options: Mapping[str, str]) -> list[str]:
+        return ['first']
+
+    factory = ParserFactory(registry)
+    factory.build_configured_parsers(())
+
+    @registry.register('second-v1')
+    def second_parser(request: RawRequest, options: Mapping[str, str]) -> list[str]:
+        return ['second']
+
+    with pytest.raises(ParserError, match='second-v1'):
+        factory.resolve_parser('second-v1')
+
+    factory.build_configured_parsers(())
+
+    assert factory.resolve_parser('first-v1')(raw_request) == ['first']
+    assert factory.resolve_parser('second-v1')(raw_request) == ['second']
 
 
 def test_factory_resolves_configured_parser_before_base(registry: ParserRegistry, raw_request: RawRequest) -> None:
@@ -226,11 +262,14 @@ def test_factory_resolves_configured_parser_before_base(registry: ParserRegistry
         return [options['value']]
 
     factory = ParserFactory(registry)
-    configured = factory.build_configured_parsers((
+    factory.build_configured_parsers((
         RawParserSection('configured-v1', 'base-v1', (('value', 'configured'),)),
     ))
+    parser = factory.resolve_parser('configured-v1')
 
-    assert factory.resolve_parser('configured-v1', configured)(raw_request) == ['configured']
+    assert inspect.isfunction(parser)
+    assert len(inspect.signature(parser).parameters) == 1
+    assert parser(raw_request) == ['configured']
 
 
 def test_factory_propagates_parser_error(registry: ParserRegistry, raw_request: RawRequest) -> None:
@@ -247,14 +286,63 @@ def test_factory_propagates_parser_error(registry: ParserRegistry, raw_request: 
         raise expected_error
 
     factory = ParserFactory(registry)
-    configured = factory.build_configured_parsers((
+    factory.build_configured_parsers((
         RawParserSection('configured-v1', 'base-v1', ()),
     ))
 
     with pytest.raises(ParserError) as error_info:
-        factory.resolve_parser('configured-v1', configured)(raw_request)
+        factory.resolve_parser('configured-v1')(raw_request)
 
     assert error_info.value is expected_error
+
+
+def test_factory_replaces_configured_parser_table(registry: ParserRegistry, raw_request: RawRequest) -> None:
+    """
+    @brief 验证成功构造会完整替换工厂内部的配置别名表。
+    @param registry 独立的基础解析器注册表。
+    @param raw_request 成功上游响应视图。
+    @return 无返回值。
+    """
+    @registry.register('base-v1')
+    def base_parser(request: RawRequest, options: Mapping[str, str]) -> list[str]:
+        return [options['value']]
+
+    factory = ParserFactory(registry)
+    factory.build_configured_parsers((
+        RawParserSection('first-v1', 'base-v1', (('value', 'first'),)),
+    ))
+    factory.build_configured_parsers((
+        RawParserSection('second-v1', 'base-v1', (('value', 'second'),)),
+    ))
+
+    with pytest.raises(ParserError, match='first-v1'):
+        factory.resolve_parser('first-v1')
+
+    assert factory.resolve_parser('second-v1')(raw_request) == ['second']
+
+
+def test_factory_retains_previous_table_after_failed_build(registry: ParserRegistry, raw_request: RawRequest) -> None:
+    """
+    @brief 验证构造失败时工厂保留最近一次成功的配置别名表。
+    @param registry 独立的基础解析器注册表。
+    @param raw_request 成功上游响应视图。
+    @return 无返回值。
+    """
+    @registry.register('base-v1')
+    def base_parser(request: RawRequest, options: Mapping[str, str]) -> list[str]:
+        return [options['value']]
+
+    factory = ParserFactory(registry)
+    factory.build_configured_parsers((
+        RawParserSection('configured-v1', 'base-v1', (('value', 'saved'),)),
+    ))
+
+    with pytest.raises(ParserError, match='missing-v1'):
+        factory.build_configured_parsers((
+            RawParserSection('replacement-v1', 'missing-v1', ()),
+        ))
+
+    assert factory.resolve_parser('configured-v1')(raw_request) == ['saved']
 
 
 if __name__ == '__main__':

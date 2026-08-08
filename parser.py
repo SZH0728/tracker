@@ -37,30 +37,7 @@ class RawRequest(object):
 BaseParser = Callable[[RawRequest, Mapping[str, str]], list[str]]
 ConfiguredParser = Callable[[RawRequest], list[str]]
 
-_EMPTY_OPTIONS: Mapping[str, str] = MappingProxyType({})
-
-
-class _ConfiguredParser(object):
-    """封装基础解析器及其不可变选项。"""
-
-    def __init__(self, base_parser: BaseParser, options: Mapping[str, str]) -> None:
-        self._base_parser = base_parser
-        self._options = options
-
-    def __call__(self, raw_request: RawRequest) -> list[str]:
-        return self._base_parser(raw_request, self._options)
-
-
-class _ParserRegistrar(object):
-    """将基础解析器注册到指定注册表。"""
-
-    def __init__(self, registry: 'ParserRegistry', name: str) -> None:
-        self._registry = registry
-        self._name = name
-
-    def __call__(self, base_parser: BaseParser) -> BaseParser:
-        self._registry._register(self._name, base_parser)
-        return base_parser
+EMPTY_OPTIONS: Mapping[str, str] = MappingProxyType({})
 
 
 class ParserRegistry(object):
@@ -88,7 +65,11 @@ class ParserRegistry(object):
         if self.contains(name):
             raise ParserError(f'基础解析器名称已注册：{name}')
 
-        return _ParserRegistrar(self, name)
+        def decorator(base_parser: BaseParser) -> BaseParser:
+            self._parsers[name] = base_parser
+            return base_parser
+
+        return decorator
 
     def get(self, name: str) -> BaseParser:
         """
@@ -104,6 +85,13 @@ class ParserRegistry(object):
 
         return self._parsers[name]
 
+    def items(self) -> Mapping[str, BaseParser]:
+        """
+        @brief 获取基础解析器的只读快照。
+        @return 基础解析器名称到双参数解析器的不可变映射。
+        """
+        return MappingProxyType(self._parsers)
+
     def contains(self, name: str) -> bool:
         """
         @brief 判断指定名称是否已注册为基础解析器。
@@ -111,12 +99,6 @@ class ParserRegistry(object):
         @return 名称已注册时返回 True，否则返回 False。
         """
         return name in self._parsers
-
-    def _register(self, name: str, base_parser: BaseParser) -> None:
-        self._raise_for_invalid_name(name)
-        if self.contains(name):
-            raise ParserError(f'基础解析器名称已注册：{name}')
-        self._parsers[name] = base_parser
 
     @staticmethod
     def _raise_for_invalid_name(name: str) -> None:
@@ -140,45 +122,73 @@ class ParserFactory(object):
         @return 无返回值；保存注入的注册表。
         """
         self._registry = registry
+        self._base_parsers: Mapping[str, ConfiguredParser] = MappingProxyType({})
+        self._configured_parsers: Mapping[str, ConfiguredParser] = MappingProxyType({})
 
-    def build_configured_parsers(self, parser_sections: Iterable[RawParserSection]) -> dict[str, ConfiguredParser]:
+    def build_configured_parsers(self, parser_sections: Iterable[RawParserSection]) -> Mapping[str, ConfiguredParser]:
         """
-        @brief 根据原始配置节构造配置化解析器。
-        @details 每个配置别名捕获自己的基础解析器和不可变非 base 选项。
+        @brief 根据原始配置节构造并安装配置化解析器。
+        @details 先封装全部基础解析器，再构建配置别名；仅在全部构造成功后替换内部表。
         @param parser_sections 来自配置边界的原始解析器配置节。
-        @return 配置别名到单参数解析器的映射。
+        @return 配置别名到单参数解析器的不可变映射。
         @throws ParserError 当别名冲突、重复或基础解析器不存在时。
         """
+        base_parsers = self._registry.items()
+        configured_base_parsers = {
+            name: self._configure_parser(base_parser, EMPTY_OPTIONS)
+            for name, base_parser in base_parsers.items()
+        }
         configured_parsers: dict[str, ConfiguredParser] = {}
+
         for section in parser_sections:
             self._raise_for_configured_name(section.name, configured_parsers)
+
             base_parser = self._registry.get(section.base)
             options: Mapping[str, str] = MappingProxyType(dict(section.options))
-            configured_parsers[section.name] = _ConfiguredParser(base_parser, options)
-        return configured_parsers
+            configured_parsers[section.name] = self._configure_parser(base_parser, options)
 
-    def resolve_parser(self, reference: str, configured_parsers: Mapping[str, ConfiguredParser]) -> ConfiguredParser:
+        self._base_parsers = MappingProxyType(configured_base_parsers)
+        self._configured_parsers = MappingProxyType(configured_parsers)
+        return self._configured_parsers
+
+    def resolve_parser(self, reference: str) -> ConfiguredParser:
         """
         @brief 按配置别名或基础名称解析单参数解析器。
-        @details 配置别名优先；直接基础名称会使用不可变空选项完成封装。
+        @details 配置别名优先；基础解析器必须已在最近一次构造中完成封装。
         @param reference 配置别名或基础解析器名称。
-        @param configured_parsers 已构造的配置别名映射。
         @return 仅接收 RawRequest 的封装解析器。
         @throws ParserError 当引用无效或无法解析时。
         """
-        if reference in configured_parsers:
-            return configured_parsers[reference]
-        return _ConfiguredParser(self._registry.get(reference), _EMPTY_OPTIONS)
+        self._raise_for_configured_name(reference, None)
 
-    def _raise_for_configured_name(self, name: str, configured_parsers: Mapping[str, ConfiguredParser]) -> None:
+        if reference in self._configured_parsers:
+            return self._configured_parsers[reference]
+
+        if reference in self._base_parsers:
+            return self._base_parsers[reference]
+
+        raise ParserError(f'未找到基础解析器：{reference}')
+
+    @staticmethod
+    def _configure_parser(base_parser: BaseParser, options: Mapping[str, str]) -> ConfiguredParser:
+        def configured_parser(raw_request: RawRequest) -> list[str]:
+            return base_parser(raw_request, options)
+
+        return configured_parser
+
+    def _raise_for_configured_name(self, name: str, configured_parsers: Mapping[str, ConfiguredParser] | None) -> None:
         if not isinstance(name, str):
             raise ParserError(f'配置解析器别名必须为字符串，实际类型为：{type(name).__name__}')
+
         if not name.strip():
             raise ParserError('配置解析器别名不能为空。')
-        if self._registry.contains(name):
-            raise ParserError(f'配置解析器别名与基础解析器名称冲突：{name}')
-        if name in configured_parsers:
-            raise ParserError(f'配置解析器别名重复：{name}')
+
+        if configured_parsers is not None:
+            if self._registry.contains(name):
+                raise ParserError(f'配置解析器别名与基础解析器名称冲突：{name}')
+
+            if name in configured_parsers:
+                raise ParserError(f'配置解析器别名重复：{name}')
 
 
 if __name__ == '__main__':
