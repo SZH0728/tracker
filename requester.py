@@ -2,77 +2,104 @@
 # AUTHOR: Sun
 
 """
-@brief 定义上游 HTTP 获取结果的不可变契约。
-@details 后续 Requester 仅以此记录向解析层传递安全的成功响应元数据或经清理的预期失败信息。
+@brief 提供上游 HTTP 获取能力。
+@details Requester 消费已校验的数据源记录，通过 requests 执行默认重定向与有限重试；成功时完整读取响应并关闭传输资源后返回原生响应。
 """
 
-from dataclasses import dataclass
-from enum import StrEnum
+from logging import getLogger
+from time import sleep
+from typing import Self
 
-__all__ = ['FetchFailureKind', 'FetchResult']
+from requests import ConnectionError, RequestException, Response, Session, Timeout
+
+from config import RawTrackerSource
+
+logger = getLogger(__name__)
 
 
-class FetchFailureKind(StrEnum):
+class Requester(object):
     """
-    @brief 枚举可预期的上游获取失败类别。
-    @details 枚举值供装配器记录稳定诊断，且不包含上游响应体或敏感请求头。
-    """
-
-    NETWORK = 'network'
-    TIMEOUT = 'timeout'
-    HTTP = 'http'
-    REDIRECT = 'redirect'
-    RESPONSE_TOO_LARGE = 'response-too-large'
-
-
-@dataclass(frozen=True, slots=True)
-class FetchResult(object):
-    """
-    @brief 表示一次上游获取的成功响应或预期失败。
-    @details 成功记录拥有完整的安全响应视图；失败记录绝不保留原始响应体。
+    @brief 获取上游 HTTP 响应。
+    @details 该类不读取配置、不持有锁且不调用解析器；fetch 使用来源级超时、重试次数和重试间隔，并将 URL 与重定向处理委托给 requests。
     """
 
-    attempts: int  # 已执行的请求次数
-    body: bytes | None  # 成功响应的原始字节
-    content_type: str | None  # 已规范化的响应内容类型
-    failure_kind: FetchFailureKind | None  # 失败的稳定类别
-    failure_message: str | None  # 已清理的失败说明
-    final_url: str | None  # 最终响应地址
-    original_url: str  # 配置的初始请求地址
-    status_code: int | None  # 上游 HTTP 状态码
-
-    def __post_init__(self) -> None:
+    def __init__(self) -> None:
         """
-        @brief 验证成功与失败记录的互斥字段。
-        @details 成功结果必须完整提供解析器所需数据，失败结果不得携带响应体。
-        @throws TypeError 当 attempts 不是整数或 body 不是字节时。
-        @throws ValueError 当结果字段组合不符合成功或失败契约时。
+        @brief 初始化共享同步请求会话。
+        @return 无返回值；创建供多次获取复用的请求会话。
         """
-        if not isinstance(self.attempts, int):
-            raise TypeError(f'attempts 必须为 int，实际类型为：{type(self.attempts).__name__}')
-        if self.attempts < 1:
-            raise ValueError(f'attempts 必须大于等于 1，实际值为：{self.attempts}')
-        if self.body is not None and not isinstance(self.body, bytes):
-            raise TypeError(f'body 必须为 bytes 或 None，实际类型为：{type(self.body).__name__}')
+        self._session = Session()
 
-        is_success = self.failure_kind is None and self.failure_message is None
-        if is_success:
-            if self.body is None or self.final_url is None or self.status_code is None:
-                raise ValueError('成功结果必须包含 body、final_url 和 status_code')
-            return
-
-        if self.failure_kind is None or self.failure_message is None:
-            raise ValueError('失败结果必须同时包含 failure_kind 和 failure_message')
-        if self.body is not None:
-            raise ValueError('失败结果不得包含响应 body')
-
-    @property
-    def is_success(self) -> bool:
+    def __enter__(self) -> Self:
         """
-        @brief 判断获取是否成功。
-        @return 成功结果返回 True，预期失败结果返回 False。
+        @brief 进入请求器上下文。
+        @return 当前请求器实例。
         """
-        return self.failure_kind is None
+        return self
+
+    def __exit__(self, exception_type: type[BaseException] | None, exception: BaseException | None, traceback: object | None) -> None:
+        """
+        @brief 退出请求器上下文并释放会话资源。
+        @param exception_type 上下文内异常的类型
+        @param exception 上下文内抛出的异常
+        @param traceback 上下文内异常的回溯信息
+        @return 无返回值；关闭共享请求会话。
+        """
+        self.close()
+
+    def close(self) -> None:
+        """
+        @brief 关闭共享请求会话。
+        @return 无返回值；释放会话持有的连接池资源。
+        """
+        self._session.close()
+
+    def fetch(self, source: RawTrackerSource) -> Response | None:
+        """
+        @brief 获取一个数据源的完整 HTTP 响应。
+        @details 仅对连接错误、超时和服务端错误进行有界重试；URL 与默认重定向由 requests 处理，成功时返回已读取内容且已关闭底层传输的原生 requests.Response。
+        @param source 已由配置边界校验的数据源记录
+        @return 满足传输策略的原生响应；预期传输失败时返回 None。
+        """
+        max_attempts = source.retry + 1
+        for attempt in range(1, max_attempts + 1):
+            logger.info(f'开始获取数据源 {source.name}，第 {attempt}/{max_attempts} 次尝试。')
+            response, can_retry = self._fetch_once(source)
+
+            if response is not None:
+                logger.info(f'成功获取数据源 {source.name}，第 {attempt}/{max_attempts} 次尝试。')
+                return response
+
+            if not can_retry or attempt == max_attempts:
+                return None
+
+            sleep(source.retry_interval)
+
+        return None
+
+    def _fetch_once(self, source: RawTrackerSource) -> tuple[Response | None, bool]:
+        try:
+            response = self._session.get(
+                source.url,
+                headers=dict(source.headers),
+                timeout=source.request_timeout,
+            )
+        except (ConnectionError, Timeout) as e:
+            logger.warning(f"获取数据源 {source.url} 失败: 网络连接或超时 ({type(e).__name__}: {e})")
+            return None, True
+        except RequestException as e:
+            logger.exception(f"获取数据源 {source.url} 失败: 遇到不可恢复的请求异常 ({type(e).__name__}: {e})")
+            return None, False
+
+        if 500 <= response.status_code <= 599:
+            logger.warning(f"获取数据源 {source.url} 失败: 服务端响应异常 (HTTP {response.status_code})")
+            return None, True
+
+        if 400 <= response.status_code <= 499:
+            logger.error(f"获取数据源 {source.url} 失败: 客户端请求错误 (HTTP {response.status_code})")
+            return None, False
+
+        return response, False
 
 
 if __name__ == '__main__':
