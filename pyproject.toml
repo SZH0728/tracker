@@ -7,7 +7,7 @@ name = "tracker"
 version = "0.1.0"
 description = "Tracker URL aggregation service"
 requires-python = "==3.14.6"
-dependencies = []
+dependencies = ["requests>=2.32,<3"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
