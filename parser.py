@@ -2,13 +2,14 @@
 # AUTHOR: Sun
 
 """
-@brief 定义解析器边界的响应视图与调用类型。
-@details 后续解析器注册表只接收成功获取后的响应视图，不读取配置文件、不执行网络或文件操作。
+@brief 定义解析器边界与调用类型。
+@details 后续解析器注册表只接收成功获取后的原生 requests.Response，不读取配置文件、不执行网络或文件操作。
 """
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
 from types import MappingProxyType
+
+from requests import Response
 
 from config import RawParserSection
 
@@ -20,22 +21,8 @@ class ParserError(Exception):
     """
 
 
-@dataclass(frozen=True, slots=True)
-class RawRequest(object):
-    """
-    @brief 表示传递给解析器的成功上游响应。
-    @details 此记录仅包含解析器策略需要的响应正文与安全元数据。
-    """
-
-    body: bytes  # 上游响应正文的原始字节
-    content_type: str | None  # 已规范化的响应内容类型
-    final_url: str  # 成功响应的最终地址
-    original_url: str  # 配置的初始请求地址
-    status_code: int  # 成功响应的 HTTP 状态码
-
-
-BaseParser = Callable[[RawRequest, Mapping[str, str]], list[str]]
-ConfiguredParser = Callable[[RawRequest], list[str]]
+BaseParser = Callable[[Response, Mapping[str, str]], list[str]]
+ConfiguredParser = Callable[[Response], list[str]]
 
 EMPTY_OPTIONS: Mapping[str, str] = MappingProxyType({})
 
@@ -125,12 +112,11 @@ class ParserFactory(object):
         self._base_parsers: Mapping[str, ConfiguredParser] = MappingProxyType({})
         self._configured_parsers: Mapping[str, ConfiguredParser] = MappingProxyType({})
 
-    def build_configured_parsers(self, parser_sections: Iterable[RawParserSection]) -> Mapping[str, ConfiguredParser]:
+    def build_configured_parsers(self, parser_sections: Iterable[RawParserSection]) -> None:
         """
         @brief 根据原始配置节构造并安装配置化解析器。
         @details 先封装全部基础解析器，再构建配置别名；仅在全部构造成功后替换内部表。
         @param parser_sections 来自配置边界的原始解析器配置节。
-        @return 配置别名到单参数解析器的不可变映射。
         @throws ParserError 当别名冲突、重复或基础解析器不存在时。
         """
         base_parsers = self._registry.items()
@@ -149,14 +135,13 @@ class ParserFactory(object):
 
         self._base_parsers = MappingProxyType(configured_base_parsers)
         self._configured_parsers = MappingProxyType(configured_parsers)
-        return self._configured_parsers
 
     def resolve_parser(self, reference: str) -> ConfiguredParser:
         """
         @brief 按配置别名或基础名称解析单参数解析器。
         @details 配置别名优先；基础解析器必须已在最近一次构造中完成封装。
         @param reference 配置别名或基础解析器名称。
-        @return 仅接收 RawRequest 的封装解析器。
+        @return 仅接收原生 Response 的封装解析器。
         @throws ParserError 当引用无效或无法解析时。
         """
         self._raise_for_configured_name(reference, None)
@@ -171,8 +156,8 @@ class ParserFactory(object):
 
     @staticmethod
     def _configure_parser(base_parser: BaseParser, options: Mapping[str, str]) -> ConfiguredParser:
-        def configured_parser(raw_request: RawRequest) -> list[str]:
-            return base_parser(raw_request, options)
+        def configured_parser(response: Response) -> list[str]:
+            return base_parser(response, options)
 
         return configured_parser
 
