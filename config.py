@@ -13,13 +13,13 @@ from pathlib import Path
 from re import compile
 
 GLOBAL_SECTION = 'global'
-GLOBAL_KEYS = frozenset({'port', 'output_file', 'refresh_interval', 'request_timeout', 'max_response_bytes'})
+GLOBAL_KEYS = frozenset({'port', 'output_file', 'refresh_interval'})
 
 TRACKER_PREFIX = 'tracker.'
 PARSER_PREFIX = 'parser.'
 
-TRACKER_REQUIRED_KEYS = frozenset({'url', 'parser'})
-TRACKER_KEYS = TRACKER_REQUIRED_KEYS | frozenset({'header', 'retry'})
+TRACKER_REQUIRED_KEYS = frozenset({'url', 'request_timeout', 'retry', 'retry_interval', 'parser'})
+TRACKER_KEYS = TRACKER_REQUIRED_KEYS | frozenset({'header'})
 PARSER_KEYS = frozenset({'base'})
 
 IDENTIFIER_PATTERN = compile(r'[A-Za-z0-9][A-Za-z0-9_.-]*\Z')
@@ -42,22 +42,22 @@ class RawGlobalConfig(object):
     port: int                # HTTP 服务监听端口
     output_file: str         # 规范 tracker 输出文件路径
     refresh_interval: int    # 刷新周期秒数
-    request_timeout: int     # 单次上游请求超时秒数
-    max_response_bytes: int  # 上游响应最大字节数
 
 
 @dataclass(frozen=True, slots=True)
 class RawTrackerSource(object):
     """
     @brief 表示一个按声明顺序处理的上游 tracker 来源。
-    @details 请求头和解析器引用保留为不可变的原始配置数据，供后续边界模块消费。
+    @details 保留不可变的请求配置与解析器引用，供请求器和解析器边界模块按各自职责消费。
     """
 
     name: str                             # tracker 配置节的别名
-    url: str                              # 上游请求地址
+    url: str                              # 请求地址
 
     headers: tuple[tuple[str, str], ...]  # 已解码且保持声明顺序的请求头
-    retry: int                            # 允许的额外请求次数
+    request_timeout: int                  # 单次请求连接与读取的超时秒数
+    retry: int                            # 请求失败后允许额外执行的次数
+    retry_interval: int                   # 两次请求尝试之间的等待秒数
 
     parser: str                           # 配置的解析器别名或基础名称
 
@@ -220,8 +220,6 @@ class Config(object):
             port=self._parse_integer(section, 'port'),
             output_file=self._parse_text(section, 'output_file'),
             refresh_interval=self._parse_integer(section, 'refresh_interval'),
-            request_timeout=self._parse_integer(section, 'request_timeout'),
-            max_response_bytes=self._parse_integer(section, 'max_response_bytes')
         )
 
     def _load_sections(self, parser: RawConfigParser) -> tuple[tuple[RawTrackerSource, ...], tuple[RawParserSection, ...]]:
@@ -256,7 +254,9 @@ class Config(object):
             name=section.name.removeprefix(TRACKER_PREFIX),
             url=self._parse_text(section, 'url'),
             headers=self._parse_headers(section, 'header'),
+            request_timeout=self._parse_integer(section, 'request_timeout'),
             retry=self._parse_integer(section, 'retry'),
+            retry_interval=self._parse_integer(section, 'retry_interval'),
             parser=self._parse_text(section, 'parser'),
         )
 
