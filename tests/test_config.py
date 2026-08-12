@@ -3,7 +3,7 @@
 
 """
 @brief 验证配置加载边界的 pytest 行为。
-@details 使用临时 INI 文件覆盖不可变快照、重载和通用字段校验。
+@details 使用临时 INI 文件覆盖不可变快照、重载和 source 级请求字段校验。
 """
 
 from pathlib import Path
@@ -16,13 +16,13 @@ VALID_CONFIGURATION = """[global]
 port = 8080
 output_file = /data/trackers.txt
 refresh_interval = 3600
-request_timeout = 15
-max_response_bytes = 1048576
 
 [tracker.public]
 url = https://example.invalid/trackers.txt
-header = {\"Accept\": \"text/plain\"}
+header = {"Accept": "text/plain"}
+request_timeout = 15
 retry = 3
+retry_interval = 2
 parser = text-lines-v1
 
 [parser.json]
@@ -56,6 +56,9 @@ def test_config_loads_immutable_ordered_records(tmp_path: Path) -> None:
     assert loaded_config.global_config.port == 8080
     assert loaded_config.tracker_sources[0].name == 'public'
     assert loaded_config.tracker_sources[0].headers == (('Accept', 'text/plain'),)
+    assert loaded_config.tracker_sources[0].request_timeout == 15
+    assert loaded_config.tracker_sources[0].retry == 3
+    assert loaded_config.tracker_sources[0].retry_interval == 2
     assert loaded_config.parser_sections[0].options == (('list_key', 'trackers'),)
     with pytest.raises(AttributeError):
         loaded_config.global_config.port = 9000  # type: ignore[misc]  # 验证冻结记录不可修改
@@ -81,14 +84,33 @@ def test_config_reload_replaces_only_successful_snapshot(tmp_path: Path) -> None
     assert configuration.config is previous_snapshot
 
 
-def test_config_rejects_invalid_integer(tmp_path: Path) -> None:
+@pytest.mark.parametrize('key', ('request_timeout', 'retry', 'retry_interval'))
+def test_config_rejects_missing_tracker_request_fields(tmp_path: Path, key: str) -> None:
     """
-    @brief 验证全局数值必须为非负十进制整数。
+    @brief 验证每个 tracker 都必须提供请求限制字段。
     @param tmp_path pytest 提供的临时目录
+    @param key 被移除的 tracker 请求字段
     @return 无返回值。
     """
     path = tmp_path / 'invalid.ini'
-    write_configuration(path, VALID_CONFIGURATION.replace('port = 8080', 'port = -1'))
+    content = VALID_CONFIGURATION.replace(f'{key} = {15 if key == "request_timeout" else 3 if key == "retry" else 2}\n', '')
+    write_configuration(path, content)
+
+    with pytest.raises(ConfigError, match='缺少必需键'):
+        Config(path)
+
+
+@pytest.mark.parametrize('key', ('request_timeout', 'retry', 'retry_interval'))
+def test_config_rejects_invalid_tracker_request_fields(tmp_path: Path, key: str) -> None:
+    """
+    @brief 验证 tracker 请求限制字段必须为非负整数。
+    @param tmp_path pytest 提供的临时目录
+    @param key 待替换的 tracker 请求字段
+    @return 无返回值。
+    """
+    path = tmp_path / 'invalid.ini'
+    content = VALID_CONFIGURATION.replace(f'{key} = {15 if key == "request_timeout" else 3 if key == "retry" else 2}', f'{key} = -1')
+    write_configuration(path, content)
 
     with pytest.raises(ConfigError, match='必须为非负十进制整数'):
         Config(path)
@@ -97,8 +119,8 @@ def test_config_rejects_invalid_integer(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ('replacement', 'message'),
     [
-        ('', '缺少必需键'),
         ('unexpected = value\n', '包含未知键'),
+        ('request_timeout = 15\n', '包含未知键'),
         ('[unsupported]\nvalue = 1\n', '包含不支持的配置节'),
         ('header = []', 'header 必须为 JSON 对象'),
     ],
@@ -112,10 +134,10 @@ def test_config_rejects_invalid_structure(tmp_path: Path, replacement: str, mess
     @return 无返回值。
     """
     path = tmp_path / 'invalid.ini'
-    if replacement == '':
-        content = VALID_CONFIGURATION.replace('parser = text-lines-v1\n', '')
-    elif replacement.startswith('unexpected'):
+    if replacement == 'unexpected = value\n':
         content = VALID_CONFIGURATION.replace('parser = text-lines-v1\n', f'parser = text-lines-v1\n{replacement}')
+    elif replacement == 'request_timeout = 15\n':
+        content = VALID_CONFIGURATION.replace('refresh_interval = 3600\n', f'refresh_interval = 3600\n{replacement}')
     elif replacement.startswith('header'):
         content = VALID_CONFIGURATION.replace('header = {"Accept": "text/plain"}', replacement)
     else:
