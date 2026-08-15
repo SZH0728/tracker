@@ -15,7 +15,7 @@ from data import RawConfig, RawGlobalConfig, RawParserSection, RawTrackerSource
 from error import ConfigError
 
 GLOBAL_SECTION = 'global'
-GLOBAL_KEYS = frozenset({'port', 'output_file', 'refresh_interval'})
+GLOBAL_KEYS = frozenset({'host', 'port', 'output_file', 'refresh_interval'})
 
 TRACKER_PREFIX = 'tracker.'
 PARSER_PREFIX = 'parser.'
@@ -161,6 +161,7 @@ class Config(object):
         self._raise_for_keys(section.name, section, GLOBAL_KEYS, GLOBAL_KEYS)
 
         return RawGlobalConfig(
+            host=self._parse_text(section, 'host'),
             port=self._parse_integer(section, 'port'),
             output_file=self._parse_text(section, 'output_file'),
             refresh_interval=self._parse_integer(section, 'refresh_interval'),
