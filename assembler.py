@@ -7,11 +7,13 @@
 """
 
 from logging import getLogger
+from threading import Event
 from time import sleep
 
-from config import RawConfig
+from data import RawConfig
+from error import ParserError
 from file import File
-from parser import ParserError, ParserFactory
+from parser import ParserFactory
 from requester import Requester
 
 logger = getLogger(__name__)
@@ -40,16 +42,19 @@ class Assembler(object):
         self._requester: Requester = Requester()
         self._parser: ParserFactory = parser
 
-    def run(self) -> None:
+    def run(self, stop_event: Event | None = None) -> None:
         """
         @brief 持续执行 tracker 刷新周期。
-        @details 启动后立即刷新；每轮完成后等待配置间隔，不创建额外线程或同步对象。
+        @details 启动后立即刷新；传入停止事件时可在等待周期内退出。
         @return 无返回值；在调用线程中持续运行。
         """
         while True:
             try:
                 self.refresh_once()
-                sleep(self._config.global_config.refresh_interval)
+                if stop_event is None:
+                    sleep(self._config.global_config.refresh_interval)
+                elif stop_event.wait(self._config.global_config.refresh_interval):
+                    return
             except KeyboardInterrupt:
                 logger.info('收到中断信号，停止 tracker 刷新。')
 
