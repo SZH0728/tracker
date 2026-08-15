@@ -78,6 +78,12 @@ class Requester(object):
         return None
 
     def _fetch_once(self, source: RawTrackerSource) -> tuple[Response | None, bool]:
+        """
+        @brief 执行一次数据源 HTTP 请求。
+        @details 连接错误、超时和 5xx 响应允许重试；其他请求异常及 4xx 响应不允许重试。成功响应原样返回。
+        @param source 已由配置边界校验的数据源记录
+        @return 响应对象与是否允许再次尝试组成的元组；请求失败时响应对象为 None。
+        """
         try:
             response = self._session.get(
                 source.url,
