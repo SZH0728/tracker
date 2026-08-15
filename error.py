@@ -24,7 +24,7 @@ class ConfigError(TrackerError):
 class ParserError(TrackerError):
     """
     @brief 表示响应内容、解析器选项或候选 URL 无效。
-    @details 有效但不含 tracker URL 的响应应由未来解析器返回空列表，而不是抛出此异常。
+    @details 有效但不含 tracker URL 的响应由解析器返回空列表，而不是抛出此异常。
     """
 
 
