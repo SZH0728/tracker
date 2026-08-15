@@ -3,7 +3,7 @@
 
 """
 @brief 定义解析器边界与调用类型。
-@details 后续解析器注册表只接收成功获取后的原生 requests.Response，不读取配置文件、不执行网络或文件操作。
+@details 解析器注册表只接收成功获取后的原生 requests.Response，不读取配置文件、不执行网络或文件操作。
 """
 
 from collections.abc import Callable, Iterable, Mapping
@@ -46,6 +46,11 @@ class ParserRegistry(object):
             raise ParserError(f'基础解析器名称已注册：{name}')
 
         def decorator(base_parser: BaseParser) -> BaseParser:
+            """
+            @brief 注册传入的基础解析器。
+            @param base_parser 待注册的双参数基础解析器
+            @return 原样返回传入的基础解析器。
+            """
             self._parsers[name] = base_parser
             return base_parser
 
@@ -82,6 +87,13 @@ class ParserRegistry(object):
 
     @staticmethod
     def _raise_for_invalid_name(name: str) -> None:
+        """
+        @brief 校验基础解析器名称。
+        @details 名称必须是非空字符串。
+        @param name 待校验的基础解析器名称
+        @return 无返回值；名称符合约束时直接结束。
+        @throws ParserError 当名称不是字符串或为空时。
+        """
         if not isinstance(name, str):
             raise ParserError(f'基础解析器名称必须为字符串，实际类型为：{type(name).__name__}')
 
@@ -92,7 +104,7 @@ class ParserRegistry(object):
 PARSER_REGISTRY = ParserRegistry()
 
 
-@PARSER_REGISTRY.register('text-lines-v1')
+@PARSER_REGISTRY.register('text-lines')
 def parse_text_lines(response: Response, options: Mapping[str, str]) -> list[str]:
     """
     @brief 解析由字面分隔符分割的纯文本列表。
@@ -151,6 +163,7 @@ class ParserFactory(object):
         @brief 根据原始配置节构造并安装配置化解析器。
         @details 先封装全部基础解析器，再构建配置别名；仅在全部构造成功后替换内部表。
         @param parser_sections 来自配置边界的原始解析器配置节。
+        @return 无返回值；成功时安装基础解析器和配置化解析器映射。
         @throws ParserError 当别名冲突、重复或基础解析器不存在时。
         """
         base_parsers = self._registry.items()
@@ -190,12 +203,32 @@ class ParserFactory(object):
 
     @staticmethod
     def _configure_parser(base_parser: BaseParser, options: Mapping[str, str]) -> ConfiguredParser:
+        """
+        @brief 将基础解析器配置为单参数解析器。
+        @details 返回的闭包捕获不可变选项，并在调用时将选项传给基础解析器。
+        @param base_parser 接收响应和选项的基础解析器
+        @param options 传给基础解析器的解析选项
+        @return 仅接收原生 Response 的配置化解析器。
+        """
         def configured_parser(response: Response) -> list[str]:
+            """
+            @brief 使用已绑定选项解析响应内容。
+            @param response 待读取的原生响应
+            @return 基础解析器生成的文本项列表。
+            """
             return base_parser(response, options)
 
         return configured_parser
 
     def _raise_for_configured_name(self, name: str, configured_parsers: Mapping[str, ConfiguredParser] | None) -> None:
+        """
+        @brief 校验配置化解析器名称。
+        @details 名称必须为非空字符串；构造配置映射时还需避免与基础名称冲突及别名重复。
+        @param name 待校验的配置化解析器名称
+        @param configured_parsers 当前正在构造的配置化解析器映射；None 表示仅校验名称格式
+        @return 无返回值；名称符合当前校验范围时直接结束。
+        @throws ParserError 当名称格式无效、与基础名称冲突或别名重复时。
+        """
         if not isinstance(name, str):
             raise ParserError(f'配置解析器别名必须为字符串，实际类型为：{type(name).__name__}')
 
