@@ -16,9 +16,10 @@ class RawGlobalConfig(object):
     @details 字段已完成通用标量校验，但尚未触发任何运行时行为。
     """
 
-    port: int                # HTTP 服务监听端口
-    output_file: str         # 规范 tracker 输出文件路径
-    refresh_interval: int    # 刷新周期秒数
+    host: str                 # HTTP 服务监听地址
+    port: int                 # HTTP 服务监听端口
+    output_file: str          # 规范 tracker 输出文件路径
+    refresh_interval: int     # 刷新周期秒数
 
 
 @dataclass(frozen=True, slots=True)
