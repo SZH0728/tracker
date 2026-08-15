@@ -37,6 +37,7 @@ class Config(object):
         """
         @brief 初始化配置并立即加载。
         @param path INI 配置文件路径
+        @return 无返回值；完成配置对象初始化并加载配置。
         @throws ConfigError 当文件无法读取、INI 格式无效或通用字段不符合约束时
         """
         self._path: Path = Path(path)
@@ -77,6 +78,8 @@ class Config(object):
         """
         @brief 从当前配置路径重新加载配置。
         @details 完整校验成功后才替换配置快照，失败时保留上一次成功加载的配置。
+        @param path 可选的配置文件路径；提供时更新当前加载路径
+        @return 无返回值；成功时更新原始配置快照。
         @throws ConfigError 当文件无法读取、INI 格式无效或通用字段不符合约束时
         """
         if path is not None:
