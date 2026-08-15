@@ -1,0 +1,14 @@
+services:
+  tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CONFIG_PATH: /config/config.ini
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "${TRACKER_HOST_PORT:-8080}:8080"
+    volumes:
+      - ./config.ini:/config/config.ini:ro
+      - ./data:/data
+    restart: unless-stopped
