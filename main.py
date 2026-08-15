@@ -17,11 +17,29 @@ logger = getLogger(__name__)
 
 
 class TrackerHandler(BaseHTTPRequestHandler):
+    """
+    @brief 提供 tracker 文件内容的 HTTP 读取接口。
+    @details GET 返回 UTF-8 文本内容，HEAD 仅返回相同响应头；其他未实现方法按 HTTP 服务约定返回错误响应。
+    """
+
     def __init__(self, *args, file: File, **kwargs):
+        """
+        @brief 初始化绑定文件对象的 HTTP 请求处理器。
+        @param args BaseHTTPRequestHandler 的位置参数
+        @param file 提供待发布文本内容的文件对象
+        @param kwargs BaseHTTPRequestHandler 的其他关键字参数
+        @return 无返回值；完成文件对象绑定并初始化父类处理器。
+        """
         self._file: File = file
         super().__init__(*args, **kwargs)
 
     def _send_content(self, include_body: bool) -> None:
+        """
+        @brief 发送文件内容的成功响应。
+        @details 响应体按 UTF-8 编码并设置文本类型与字节长度；include_body 为 False 时只发送响应头。
+        @param include_body 是否写入响应体
+        @return 无返回值；完成 HTTP 响应发送。
+        """
         content: str = self._file.read()
         body: bytes = content.encode('utf-8')
 
@@ -34,12 +52,28 @@ class TrackerHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_GET(self) -> None:
+        """
+        @brief 处理 GET 请求。
+        @return 无返回值；发送包含文件内容的成功响应。
+        """
         self._send_content(True)
 
     def do_HEAD(self) -> None:
+        """
+        @brief 处理 HEAD 请求。
+        @return 无返回值；发送不包含响应体的成功响应。
+        """
         self._send_content(False)
 
     def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
+        """
+        @brief 发送 HTTP 错误响应。
+        @details 未实现的方法代码 501 被转换为 405，并声明允许 GET 与 HEAD；其他状态码交由父类处理。
+        @param code 原始 HTTP 状态码
+        @param message 可选的错误消息
+        @param explain 可选的错误说明
+        @return 无返回值；完成错误响应发送。
+        """
         if code == 501:
             self.send_response(405)
             self.send_header('Allow', 'GET, HEAD')
@@ -50,11 +84,17 @@ class TrackerHandler(BaseHTTPRequestHandler):
         super().send_error(code, message, explain)
 
     def log_message(self, format: str, *args: object) -> None:
+        """
+        @brief 记录 HTTP 请求处理日志。
+        @param format 日志格式字符串
+        @param args 格式化日志参数
+        @return 无返回值；将请求日志写入项目日志记录器。
+        """
         logger.info(format, *args)
 
 
 if __name__ == '__main__':
-    config_object: Config = Config('')
+    config_object: Config = Config('config.example.ini')
     file_object: File = File(config_object.config.global_config.output_file)
 
     parser_factory: ParserFactory = ParserFactory(PARSER_REGISTRY)
