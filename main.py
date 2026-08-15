@@ -7,6 +7,7 @@ from logging import getLogger
 from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Event, Thread
+from os import getenv
 
 from assembler import Assembler
 from config import Config
@@ -54,15 +55,30 @@ class TrackerHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         """
         @brief 处理 GET 请求。
-        @return 无返回值；发送包含文件内容的成功响应。
+        @return 无返回值；发送健康状态或包含文件内容的成功响应。
         """
+        if self.path == '/health':
+            body: bytes = b'OK\n'
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         self._send_content(True)
 
     def do_HEAD(self) -> None:
         """
         @brief 处理 HEAD 请求。
-        @return 无返回值；发送不包含响应体的成功响应。
+        @return 无返回值；发送健康状态或不包含响应体的成功响应。
         """
+        if self.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+
         self._send_content(False)
 
     def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
@@ -94,7 +110,7 @@ class TrackerHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    config_object: Config = Config('config.example.ini')
+    config_object: Config = Config(getenv('CONFIG_PATH', 'config.ini'))
     file_object: File = File(config_object.config.global_config.output_file)
 
     parser_factory: ParserFactory = ParserFactory(PARSER_REGISTRY)
@@ -103,7 +119,7 @@ if __name__ == '__main__':
     assembler_object: Assembler = Assembler(config_object.config, file_object, parser_factory)
 
     handler: partial[TrackerHandler] = partial(TrackerHandler, file=file_object)
-    server: HTTPServer = HTTPServer(('127.0.0.1', config_object.config.global_config.port), handler)
+    server: HTTPServer = HTTPServer((config_object.config.global_config.host, config_object.config.global_config.port), handler)
 
     stop_event: Event = Event()
 
