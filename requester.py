@@ -12,7 +12,7 @@ from typing import Self
 
 from requests import ConnectionError, RequestException, Response, Session, Timeout
 
-from config import RawTrackerSource
+from data import RawTrackerSource
 
 logger = getLogger(__name__)
 
@@ -57,7 +57,7 @@ class Requester(object):
     def fetch(self, source: RawTrackerSource) -> Response | None:
         """
         @brief 获取一个数据源的完整 HTTP 响应。
-        @details 仅对连接错误、超时和服务端错误进行有界重试；URL 与默认重定向由 requests 处理，成功时返回已读取内容且已关闭底层传输的原生 requests.Response。
+        @details 仅对连接错误、超时和服务端错误进行有界重试，成功时返回已读取内容且已关闭底层传输的原生 requests.Response。
         @param source 已由配置边界校验的数据源记录
         @return 满足传输策略的原生响应；预期传输失败时返回 None。
         """
