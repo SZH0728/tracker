@@ -96,6 +96,47 @@ class ParserRegistry(object):
             raise ParserError('基础解析器名称不能为空。')
 
 
+PARSER_REGISTRY = ParserRegistry()
+
+
+@PARSER_REGISTRY.register('text-lines-v1')
+def parse_text_lines(response: Response, options: Mapping[str, str]) -> list[str]:
+    """
+    @brief 解析由字面分隔符分割的纯文本列表。
+    @details 默认按换行符及 UTF-8 编码解析；支持 delimiter 和 encoding 选项，空白候选项不会出现在结果中。
+    @param response 已成功获取的原生响应。
+    @param options 不可变的解析器选项。
+    @return 按响应顺序保留的非空文本项。
+    @throws ParserError 当选项无效、编码不可用或响应内容不符合指定编码时。
+    """
+    unexpected_options = set(options) - {'delimiter', 'encoding'}
+    if unexpected_options:
+        raise ParserError(f'文本解析器不支持的选项：{", ".join(sorted(unexpected_options))}')
+
+    delimiter = options.get('delimiter', '\n')
+    if not isinstance(delimiter, str):
+        raise ParserError(f'文本解析器分隔符必须为字符串，实际类型为：{type(delimiter).__name__}')
+
+    if not delimiter:
+        raise ParserError('文本解析器分隔符不能为空。')
+
+    encoding = options.get('encoding', 'utf-8')
+    if not isinstance(encoding, str):
+        raise ParserError(f'文本解析器编码必须为字符串，实际类型为：{type(encoding).__name__}')
+
+    if not encoding:
+        raise ParserError('文本解析器编码不能为空。')
+
+    try:
+        content = response.content.decode(encoding)
+    except LookupError as error:
+        raise ParserError(f'文本解析器不支持编码：{encoding}') from error
+    except UnicodeDecodeError as error:
+        raise ParserError(f'文本解析器响应内容必须为 {encoding} 编码。') from error
+
+    return [candidate.strip() for candidate in content.split(delimiter) if candidate.strip()]
+
+
 class ParserFactory(object):
     """
     @brief 基于注册表构造供调用方使用的单参数解析器。
