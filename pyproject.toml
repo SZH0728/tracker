@@ -13,7 +13,7 @@ dependencies = ["requests>=2.32,<3"]
 test = ["pytest>=8,<10"]
 
 [tool.setuptools]
-py-modules = ["assembler", "config", "file", "main", "parser", "requester"]
+py-modules = ["assembler", "config", "data", "error", "file", "main", "parser", "requester"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
