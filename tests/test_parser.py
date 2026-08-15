@@ -13,7 +13,7 @@ import pytest
 from requests import PreparedRequest, Response
 
 from config import RawParserSection
-from parser import ParserError, ParserFactory, ParserRegistry
+from parser import PARSER_REGISTRY, ParserError, ParserFactory, ParserRegistry
 
 
 @pytest.fixture
@@ -227,5 +227,72 @@ def test_factory_retains_previous_table_after_failed_build(registry: ParserRegis
     assert factory.resolve_parser('configured-v1')(response) == ['saved']
 
 
-if __name__ == '__main__':
-    pass
+def test_text_lines_parser_uses_newline_delimiter_by_default(response: Response) -> None:
+    response._content = b' udp://first.example:80 \n\nhttp://second.example/path\n udp://first.example:80\n'
+
+    parser = PARSER_REGISTRY.get('text-lines-v1')
+
+    assert parser(response, {}) == [
+        'udp://first.example:80',
+        'http://second.example/path',
+        'udp://first.example:80',
+    ]
+
+
+def test_text_lines_parser_supports_configured_delimiter(response: Response) -> None:
+    response._content = b'udp://first.example:80\n\n https://second.example/path \n\n\n\n'
+
+    parser = PARSER_REGISTRY.get('text-lines-v1')
+
+    assert parser(response, {'delimiter': '\n\n'}) == [
+        'udp://first.example:80',
+        'https://second.example/path',
+    ]
+
+
+@pytest.mark.parametrize('content', [b'', b' \n\t\n '])
+def test_text_lines_parser_returns_empty_list_for_empty_content(response: Response, content: bytes) -> None:
+    response._content = content
+
+    assert PARSER_REGISTRY.get('text-lines-v1')(response, {}) == []
+
+
+def test_text_lines_parser_supports_configured_encoding(response: Response) -> None:
+    response._content = ' udp://café.example:80\n'.encode('latin-1')
+
+    parser = PARSER_REGISTRY.get('text-lines-v1')
+
+    assert parser(response, {'encoding': 'latin-1'}) == ['udp://café.example:80']
+
+
+def test_factory_applies_builtin_text_lines_encoding_option(response: Response) -> None:
+    response._content = 'udp://café.example:80\n'.encode('latin-1')
+    factory = ParserFactory(PARSER_REGISTRY)
+    factory.build_configured_parsers((RawParserSection('latin-text-lines', 'text-lines-v1', (('encoding', 'latin-1'),)),))
+
+    assert factory.resolve_parser('latin-text-lines')(response) == ['udp://café.example:80']
+
+
+@pytest.mark.parametrize('options', [{'unknown': 'value'}, {'delimiter': ''}, {'encoding': ''}, {'encoding': 1}])
+def test_text_lines_parser_rejects_invalid_options(response: Response, options: Mapping[str, str]) -> None:
+    with pytest.raises(ParserError):
+        PARSER_REGISTRY.get('text-lines-v1')(response, options)
+
+
+def test_text_lines_parser_rejects_non_utf8_content(response: Response) -> None:
+    response._content = b'\xff'
+
+    with pytest.raises(ParserError, match='utf-8'):
+        PARSER_REGISTRY.get('text-lines-v1')(response, {})
+
+
+def test_text_lines_parser_rejects_unknown_encoding(response: Response) -> None:
+    with pytest.raises(ParserError, match='unknown-encoding'):
+        PARSER_REGISTRY.get('text-lines-v1')(response, {'encoding': 'unknown-encoding'})
+
+
+def test_factory_resolves_builtin_text_lines_parser(response: Response) -> None:
+    factory = ParserFactory(PARSER_REGISTRY)
+    factory.build_configured_parsers(())
+
+    assert factory.resolve_parser('text-lines-v1')(response) == ['udp://tracker.example:80']
