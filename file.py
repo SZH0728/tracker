@@ -10,8 +10,6 @@ from os import replace
 from pathlib import Path
 from threading import Lock
 
-TRACKER_CONTENT_ENCODING: str = 'utf-8'
-
 
 class File(object):
     """
@@ -31,23 +29,22 @@ class File(object):
     def read(self) -> str:
         """
         @brief 读取当前完整的规范 tracker 内容。
-        @return 可用的规范文本；缺失、不可读、畸形或空白内容时返回空字符串。
+        @return 可用的规范文本。
         """
         with self._lock:
-            content = self._path.read_text(encoding=TRACKER_CONTENT_ENCODING)
+            content = self._path.read_text(encoding='utf-8')
 
         return content.strip()
 
     def publish(self, content: str) -> None:
         """
         @brief 原子发布完整的规范 tracker 内容。
-        @details 先在固定同级临时文件中完成写入和同步，再在唯一锁保护下替换 canonical 文件。
+        @details 先在固定同级临时文件中完成写入和同步，再在唯一锁保护下替换文件。
         @param content 完整的规范 tracker 文本内容。
-        @return 发布成功时返回 True；暂存或替换失败且旧文件被保留时返回 False。
-        @throws TypeError 当内容不是 str 时。
+        @return 无返回值。
         """
         temporary_path = self._path.with_name(f'{self._path.name}.tmp')
-        with temporary_path.open('w', encoding=TRACKER_CONTENT_ENCODING) as temporary_file:
+        with temporary_path.open('w', encoding='utf-8') as temporary_file:
             temporary_file.write(content)
 
         with self._lock:
